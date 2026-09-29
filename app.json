@@ -25,12 +25,7 @@
       "favicon": "./assets/images/favicon.png"
     },
     "plugins": [
-      [
-        "react-native-maps",
-        {
-          "androidGoogleMapsApiKey": "AIzaSyDp1m24jCv0artNLvNYGiRemEEjwAduk20"
-        }
-      ],
+      ["react-native-maps", {}],
       "expo-router",
       [
         "expo-splash-screen",
@@ -48,7 +43,6 @@
     },
     "extra": {
       "router": {},
-      "googleMapsWebApiKey": "AIzaSyDp1m24jCv0artNLvNYGiRemEEjwAduk20",
       "eas": {
         "projectId": "c8407538-fda4-43fb-8b98-6e290f6bd41a"
       }
