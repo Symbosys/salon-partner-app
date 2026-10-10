@@ -167,10 +167,7 @@ export default function BookingDetailsScreen() {
       const data = await response.json();
 
       if (!response.ok) {
-        Alert.alert(
-          "QR Verification Failed",
-          data.message || "Invalid customer QR code.",
-        );
+        Alert.alert("QR Verification Failed", "Please try again.");
 
         setScanned(false);
         return;

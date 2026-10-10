@@ -1,6 +1,7 @@
+import { registerForPushNotificationsAsync } from "@/services/notifications";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import Constants from "expo-constants";
-import * as DocumentPicker from "expo-document-picker";
+import * as FileSystem from "expo-file-system/legacy";
 import * as ImagePicker from "expo-image-picker";
 import * as Location from "expo-location";
 import { useRouter } from "expo-router";
@@ -29,6 +30,9 @@ export default function PartnerRegistrationScreen() {
   const [aadhaarNumber, setAadhaarNumber] = useState("");
   const [panNumber, setPanNumber] = useState("");
   const [salonImage, setSalonImage] = useState<string | null>(null);
+  const [salonImagePreview, setSalonImagePreview] = useState<string | null>(
+    null,
+  );
   const [aadhaarDocument, setAadhaarDocument] = useState<string | null>(null);
   const [panDocument, setPanDocument] = useState<string | null>(null);
 
@@ -61,34 +65,163 @@ export default function PartnerRegistrationScreen() {
   }, []);
 
   const pickSalonImage = async () => {
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ["images"],
-      allowsEditing: true,
-      aspect: [4, 3],
-      quality: 0.8,
-    });
-    if (!result.canceled) {
-      setSalonImage(result.assets[0].uri);
-      setErrors((prev) => ({ ...prev, salonImage: "" }));
+    try {
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ["images"],
+        allowsEditing: true,
+        aspect: [4, 3],
+        quality: 0.8,
+      });
+
+      if (!result.canceled) {
+        const fileUri = result.assets[0].uri;
+
+        // Show selected image immediately
+        setSalonImagePreview(fileUri);
+
+        // Upload image to backend
+        const uploadedUrl = await uploadSalonImage(fileUri);
+
+        // Save backend URL for registration
+        setSalonImage(uploadedUrl);
+
+        setErrors((prev) => ({
+          ...prev,
+          salonImage: "",
+        }));
+      }
+    } catch (error) {
+      console.error("Salon Image Selection/Upload Error:", error);
+
+      setErrors((prev) => ({
+        ...prev,
+        salonImage: "Salon image upload failed. Please try again.",
+      }));
+    }
+  };
+
+  const uploadKycImage = async (uri: string) => {
+    try {
+      const fileName = uri.split("/").pop() || `kyc-${Date.now()}.jpg`;
+
+      const extension = fileName.split(".").pop()?.toLowerCase() || "jpg";
+
+      const mimeType = extension === "png" ? "image/png" : "image/jpeg";
+
+      const result = await FileSystem.uploadAsync(
+        `${API_URL}/api/uploads/kyc`,
+        uri,
+        {
+          httpMethod: "POST",
+          uploadType: FileSystem.FileSystemUploadType.MULTIPART,
+          fieldName: "document",
+          mimeType,
+        },
+      );
+
+      console.log("KYC Image Upload Response:", result.status, result.body);
+
+      const data = JSON.parse(result.body);
+
+      if (result.status < 200 || result.status >= 300) {
+        throw new Error(data?.message || "KYC image upload failed");
+      }
+
+      return data.url?.startsWith("http")
+        ? data.url
+        : `${API_URL}${data.url?.startsWith("/") ? "" : "/"}${data.url}`;
+    } catch (error: any) {
+      console.error("KYC Image Upload Error:", error);
+
+      throw new Error(
+        error?.message || "KYC image upload failed. Please try again.",
+      );
+    }
+  };
+
+  const uploadSalonImage = async (uri: string) => {
+    try {
+      const fileName = uri.split("/").pop() || `salon-${Date.now()}.jpg`;
+
+      const extension = fileName.split(".").pop()?.toLowerCase() || "jpg";
+
+      const mimeType = extension === "png" ? "image/png" : "image/jpeg";
+
+      const result = await FileSystem.uploadAsync(
+        `${API_URL}/api/uploads/kyc`,
+        uri,
+        {
+          httpMethod: "POST",
+          uploadType: FileSystem.FileSystemUploadType.MULTIPART,
+          fieldName: "document",
+          mimeType,
+        },
+      );
+
+      console.log("Salon Image Upload Response:", result.status, result.body);
+
+      let data: any = {};
+
+      try {
+        data = JSON.parse(result.body);
+      } catch {
+        data = {};
+      }
+
+      if (result.status < 200 || result.status >= 300) {
+        throw new Error(data?.message || "Salon image upload failed");
+      }
+
+      return data.url?.startsWith("http")
+        ? data.url
+        : `${API_URL}${data.url?.startsWith("/") ? "" : "/"}${data.url}`;
+    } catch (error: any) {
+      console.error("Salon Image Upload Error:", error);
+
+      throw new Error(
+        error?.message || "Salon image upload failed. Please try again.",
+      );
     }
   };
 
   const pickDocument = async (type: "aadhaar" | "pan") => {
-    const result = await DocumentPicker.getDocumentAsync({
-      type: ["image/*", "application/pdf"],
-      copyToCacheDirectory: true,
-    });
+    const field = type === "aadhaar" ? "aadhaarDocument" : "panDocument";
 
-    if (!result.canceled) {
-      const fileUri = result.assets[0].uri;
+    try {
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ["images"],
+        allowsEditing: true,
+        quality: 0.8,
+      });
+
+      if (result.canceled) {
+        return;
+      }
+
+      const asset = result.assets[0];
+
+      console.log("Selected KYC image:", asset.uri);
+
+      // Upload using the same working ImagePicker upload flow
+      const uploadedUrl = await uploadKycImage(asset.uri);
 
       if (type === "aadhaar") {
-        setAadhaarDocument(fileUri);
-        setErrors((prev) => ({ ...prev, aadhaarDocument: "" }));
+        setAadhaarDocument(uploadedUrl);
       } else {
-        setPanDocument(fileUri);
-        setErrors((prev) => ({ ...prev, panDocument: "" }));
+        setPanDocument(uploadedUrl);
       }
+
+      setErrors((prev) => ({
+        ...prev,
+        [field]: "",
+      }));
+    } catch (error: any) {
+      console.error(`${type} Image Upload Error:`, error);
+
+      setErrors((prev) => ({
+        ...prev,
+        [field]: error?.message || "Document upload failed. Please try again.",
+      }));
     }
   };
 
@@ -282,11 +415,6 @@ export default function PartnerRegistrationScreen() {
 
       const components = result.address_components || [];
 
-      console.log(
-        "OLA ADDRESS COMPONENTS:",
-        JSON.stringify(components, null, 2),
-      );
-
       const getComponent = (type: string) => {
         const component = components.find((item: any) =>
           item.types?.includes(type),
@@ -304,31 +432,19 @@ export default function PartnerRegistrationScreen() {
 
       const detectedPincode = getComponent("postal_code");
 
-      const detectedAddress = components
-        .filter((item: any) => {
-          const types = item.types || [];
-
-          return (
-            types.includes("route") ||
-            types.includes("street_address") ||
-            types.includes("premise") ||
-            types.includes("subpremise") ||
-            types.includes("neighborhood") ||
-            types.includes("sublocality")
-          );
-        })
-        .map((item: any) => item.long_name)
-        .filter(Boolean)
-        .join(", ");
+      // IMPORTANT:
+      // Use Ola Maps complete formatted address.
+      // Do not manually build address from components.
+      const actualAddress = result.formatted_address || "Selected location";
 
       console.log("========== OLA LOCATION ==========");
-      console.log("Address:", detectedAddress);
+      console.log("Formatted Address:", actualAddress);
       console.log("City:", detectedCity);
       console.log("State:", detectedState);
       console.log("Pincode:", detectedPincode);
       console.log("==================================");
 
-      setAddress(detectedAddress);
+      setAddress(actualAddress);
       setCity(detectedCity);
       setState(detectedState);
       setPincode(detectedPincode);
@@ -495,6 +611,16 @@ export default function PartnerRegistrationScreen() {
         const statusData = await statusResponse.json();
         const existingSalon = statusData?.salon;
 
+        const existingPartnerId = statusData?.partner?.id;
+
+        if (existingPartnerId) {
+          await AsyncStorage.setItem("partnerId", String(existingPartnerId));
+
+          console.log("EXISTING PARTNER ID SAVED:", existingPartnerId);
+        } else {
+          console.log("Partner ID missing in status response:", statusData);
+        }
+
         // If existing application is rejected,
         // update the same salon instead of creating a new one.
         if (existingSalon?.status === "REJECTED") {
@@ -535,7 +661,7 @@ export default function PartnerRegistrationScreen() {
             }));
             return;
           }
-
+          await registerForPushNotificationsAsync();
           router.push("/partner/verification" as any);
           return;
         }
@@ -575,6 +701,17 @@ export default function PartnerRegistrationScreen() {
           submit: data?.message || "Registration failed",
         }));
         return;
+      }
+
+      const partnerId = data?.partner?.id;
+
+      if (partnerId) {
+        await AsyncStorage.setItem("partnerId", String(partnerId));
+        console.log("PARTNER ID SAVED:", partnerId);
+
+        await registerForPushNotificationsAsync();
+      } else {
+        console.error("Partner ID missing in registration response:", data);
       }
 
       router.push("/partner/verification" as any);
@@ -697,9 +834,9 @@ export default function PartnerRegistrationScreen() {
                 activeOpacity={0.7}
                 onPress={pickSalonImage}
               >
-                {salonImage ? (
+                {salonImagePreview ? (
                   <Image
-                    source={{ uri: salonImage }}
+                    source={{ uri: salonImagePreview }}
                     style={styles.salonImagePreview}
                   />
                 ) : (
@@ -713,7 +850,7 @@ export default function PartnerRegistrationScreen() {
               {errors.salonImage ? (
                 <Text style={styles.fieldError}>{errors.salonImage}</Text>
               ) : null}
-              {salonImage && (
+              {salonImagePreview && (
                 <TouchableOpacity
                   activeOpacity={0.7}
                   onPress={pickSalonImage}
@@ -971,7 +1108,7 @@ export default function PartnerRegistrationScreen() {
                 <Text style={styles.uploadSubtext}>
                   {aadhaarDocument
                     ? "Tap to change document"
-                    : "JPG, PNG or PDF"}
+                    : "JPG, JPEG or PNG • Max 5 MB"}
                 </Text>
               </TouchableOpacity>
               {errors.aadhaarDocument ? (
@@ -1014,7 +1151,9 @@ export default function PartnerRegistrationScreen() {
                   {panDocument ? "PAN Card Selected" : "Upload PAN Card"}
                 </Text>
                 <Text style={styles.uploadSubtext}>
-                  {panDocument ? "Tap to change document" : "JPG, PNG or PDF"}
+                  {panDocument
+                    ? "Tap to change document"
+                    : "JPG, JPEG or PNG • Max 5 MB"}
                 </Text>
               </TouchableOpacity>
               {errors.panDocument ? (

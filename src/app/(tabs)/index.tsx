@@ -51,6 +51,7 @@ export default function HomeScreen() {
   const reverseGeocodeLocation = async (
     latitude: number,
     longitude: number,
+    addressOverride?: string,
   ) => {
     try {
       setLocationLoading(true);
@@ -90,33 +91,16 @@ export default function HomeScreen() {
       const detectedState = getComponent("administrative_area_level_1");
       const detectedPincode = getComponent("postal_code");
 
-      const detectedAddress = components
-        .filter((item: any) => {
-          const types = item.types || [];
+      const actualAddress =
+        addressOverride || result.formatted_address || "Selected location";
 
-          return (
-            types.includes("route") ||
-            types.includes("street_address") ||
-            types.includes("premise") ||
-            types.includes("subpremise") ||
-            types.includes("neighborhood") ||
-            types.includes("sublocality")
-          );
-        })
-        .map((item: any) => item.long_name)
-        .filter(Boolean)
-        .join(", ");
-
-      setSelectedAddress(
-        detectedAddress || result.formatted_address || "Selected location",
-      );
+      setSelectedAddress(actualAddress);
       setSelectedCity(detectedCity);
       setSelectedState(detectedState);
       setSelectedPincode(detectedPincode);
 
       return {
-        address:
-          detectedAddress || result.formatted_address || "Selected location",
+        address: actualAddress,
         city: detectedCity,
         state: detectedState,
         pincode: detectedPincode,
@@ -1212,13 +1196,17 @@ window.selectLocation = function(placeId) {
                           map.setCenter(position);
                           map.setZoom(16);
 
-                          window.ReactNativeWebView.postMessage(
-                            JSON.stringify({
-                              type: "LOCATION_CHANGED",
-                              latitude: latitude,
-                              longitude: longitude
-                            })
-                          );
+                         window.ReactNativeWebView.postMessage(
+  JSON.stringify({
+    type: "LOCATION_SELECTED",
+    latitude: latitude,
+    longitude: longitude,
+    address:
+      place.formatted_address ||
+      place.name ||
+      ""
+  })
+);
                         }
                       }
                     );
@@ -1257,9 +1245,23 @@ window.selectLocation = function(placeId) {
                       setSelectedLongitude(longitude);
 
                       setLocationSuggestions([]);
-                      setLocationSearch(data.address || "");
 
-                      await reverseGeocodeLocation(latitude, longitude);
+                      const selectedAddress =
+                        data.address || "Selected location";
+
+                      setLocationSearch(selectedAddress);
+
+                      // Google Places ka actual business/place address
+                      // preserve karna hai.
+                      setSelectedAddress(selectedAddress);
+
+                      // Coordinates se city/state/pincode detect karo
+                      // lekin Google ka actual place address overwrite mat karo.
+                      await reverseGeocodeLocation(
+                        latitude,
+                        longitude,
+                        selectedAddress,
+                      );
 
                       return;
                     }

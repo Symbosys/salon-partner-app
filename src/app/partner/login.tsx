@@ -1,4 +1,5 @@
 import { API_URL } from "@/constants/api";
+import { registerForPushNotificationsAsync } from "@/services/notifications";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useRouter } from "expo-router";
 import { useRef, useState } from "react";
@@ -37,7 +38,7 @@ export default function PartnerLoginScreen() {
 
     const mobile = mobileNumber.trim();
 
-    if (!/^\d{10}$/.test(mobile)) {
+    if (!/^[6-9]\d{9}$/.test(mobile)) {
       setMobileError("Please enter a valid 10-digit mobile number");
       return;
     }
@@ -114,6 +115,20 @@ export default function PartnerLoginScreen() {
 
       const salon = data?.salon;
 
+      const partner = data?.partner;
+
+      if (partner?.id) {
+        await AsyncStorage.setItem("partnerId", String(partner.id));
+        console.log("PARTNER ID SAVED FROM LOGIN:", partner.id);
+
+        await registerForPushNotificationsAsync();
+      }
+
+      if (partner?.status === "SUSPENDED") {
+        router.replace("/account-suspended" as any);
+        return;
+      }
+
       // Application rejected
       if (salon?.status === "REJECTED") {
         router.replace("/partner/registration" as any);
@@ -177,7 +192,14 @@ export default function PartnerLoginScreen() {
       }
 
       await AsyncStorage.setItem("partnerMobile", mobile);
+
       await checkRegisteredPartner(mobile);
+
+      const storedPartnerId = await AsyncStorage.getItem("partnerId");
+
+      if (storedPartnerId) {
+        await registerForPushNotificationsAsync();
+      }
     } catch (error) {
       console.error("Verify OTP Error:", error);
       setOtpError("Unable to connect to server");
@@ -306,7 +328,18 @@ export default function PartnerLoginScreen() {
                       const cleaned = value.replace(/\D/g, "").slice(0, 10);
 
                       setMobileNumber(cleaned);
-                      setMobileError("");
+
+                      if (cleaned.length === 0) {
+                        setMobileError("");
+                      } else if (!/^[6-9]/.test(cleaned)) {
+                        setMobileError("Please enter a valid mobile number");
+                      } else if (cleaned.length < 10) {
+                        setMobileError("Mobile number must be 10 digits");
+                      } else if (!/^[6-9]\d{9}$/.test(cleaned)) {
+                        setMobileError("Please enter a valid mobile number");
+                      } else {
+                        setMobileError("");
+                      }
                     }}
                   />
                 </View>

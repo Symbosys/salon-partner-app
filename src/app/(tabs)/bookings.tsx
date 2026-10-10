@@ -1,7 +1,7 @@
 import { API_URL } from "@/constants/api";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import DateTimePicker from "@react-native-community/datetimepicker";
-import { router, useFocusEffect } from "expo-router";
+import { router, useFocusEffect, useLocalSearchParams } from "expo-router";
 import { useCallback, useEffect, useState } from "react";
 import {
   Alert,
@@ -14,7 +14,18 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 
 export default function PartnerBookingsScreen() {
+  const { tab } = useLocalSearchParams<{ tab?: string }>();
+
   const [selectedTab, setSelectedTab] = useState("Pending");
+
+  useEffect(() => {
+    const requestedTab = Array.isArray(tab) ? tab[0] : tab;
+
+    if (requestedTab?.toLowerCase() === "rejected") {
+      setSelectedTab("Rejected");
+    }
+  }, [tab]);
+
   const [bookings, setBookings] = useState<any[]>([]);
 
   const getLocalDateString = (date: Date) => {
@@ -600,7 +611,9 @@ export default function PartnerBookingsScreen() {
                               ? "Not Arrived"
                               : booking.cancelReason === "SALON_NOT_ACCEPTED"
                                 ? "Salon Not Accepted"
-                                : "Rejected"}
+                                : booking.cancelReason === "Admin cancelled"
+                                  ? "Rejected by Admin"
+                                  : "Rejected"}
                           </Text>
                         </View>
                       </View>

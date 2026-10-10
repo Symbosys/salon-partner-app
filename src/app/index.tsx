@@ -4,59 +4,85 @@ import { Redirect } from "expo-router";
 import { useEffect, useState } from "react";
 import { ActivityIndicator, View } from "react-native";
 
+type AppRoute =
+  | "/partner/login"
+  | "/partner/registration"
+  | "/partner/correction"
+  | "/partner/verification"
+  | "/account-suspended"
+  | "/(tabs)";
+
 export default function Index() {
   const [loading, setLoading] = useState(true);
-  const [route, setRoute] = useState<string>("/partner/login");
+  const [route, setRoute] = useState<AppRoute>("/partner/login");
 
   useEffect(() => {
+    let isMounted = true;
+
     const checkPartnerSession = async () => {
       try {
         const mobile = await AsyncStorage.getItem("partnerMobile");
 
         if (!mobile) {
-          setRoute("/partner/login");
+          if (isMounted) setRoute("/partner/login");
           return;
         }
 
         const response = await fetch(`${API_URL}/api/salons/partner/${mobile}`);
 
+        if (!response.ok) {
+          if (isMounted) setRoute("/partner/login");
+          return;
+        }
+
         const data = await response.json();
 
         console.log("Startup Partner Check:", response.status, data);
 
-        if (!response.ok || data?.registered !== true) {
-          setRoute("/partner/registration");
+        if (data?.registered !== true) {
+          if (isMounted) setRoute("/partner/registration");
           return;
         }
 
+        const partner = data?.partner;
         const salon = data?.salon;
 
+        if (partner?.status === "SUSPENDED") {
+          if (isMounted) setRoute("/account-suspended");
+          return;
+        }
+
         if (salon?.status === "REJECTED") {
-          setRoute("/partner/correction");
+          if (isMounted) setRoute("/partner/correction");
           return;
         }
 
         if (salon?.status === "PENDING") {
-          setRoute("/partner/verification");
+          if (isMounted) setRoute("/partner/verification");
           return;
         }
 
         if (salon?.status === "APPROVED") {
-          setRoute("/(tabs)");
+          if (isMounted) setRoute("/(tabs)");
           return;
         }
 
-        setRoute("/partner/registration");
+        if (isMounted) setRoute("/partner/registration");
       } catch (error) {
         console.error("Startup Partner Check Error:", error);
 
-        setRoute("/partner/registration");
+        // Network error par registration status assume mat karo.
+        if (isMounted) setRoute("/partner/login");
       } finally {
-        setLoading(false);
+        if (isMounted) setLoading(false);
       }
     };
 
     checkPartnerSession();
+
+    return () => {
+      isMounted = false;
+    };
   }, []);
 
   if (loading) {
@@ -66,6 +92,7 @@ export default function Index() {
           flex: 1,
           justifyContent: "center",
           alignItems: "center",
+          backgroundColor: "#FFFFFF",
         }}
       >
         <ActivityIndicator size="large" color="#5B3CC4" />
