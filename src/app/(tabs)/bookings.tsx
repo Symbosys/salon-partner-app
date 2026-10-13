@@ -16,7 +16,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 export default function PartnerBookingsScreen() {
   const { tab } = useLocalSearchParams<{ tab?: string }>();
 
-  const [selectedTab, setSelectedTab] = useState("Pending");
+  const [selectedTab, setSelectedTab] = useState("Confirmed");
 
   useEffect(() => {
     const requestedTab = Array.isArray(tab) ? tab[0] : tab;
@@ -86,22 +86,26 @@ export default function PartnerBookingsScreen() {
     }
   };
 
-  const handleReject = (bookingId: string) => {
+  const handleCancelBooking = (bookingId: string) => {
     Alert.alert(
-      "Reject Booking",
-      "Are you sure you want to reject this booking?",
+      "Cancel Booking",
+      "Are you sure you want to cancel this appointment?",
       [
         {
-          text: "Cancel",
+          text: "Keep Booking",
           style: "cancel",
         },
         {
-          text: "OK",
+          text: "Cancel Booking",
+          style: "destructive",
           onPress: async () => {
             try {
               const mobile = await AsyncStorage.getItem("partnerMobile");
 
-              if (!mobile) return;
+              if (!mobile) {
+                Alert.alert("Error", "Partner information not found.");
+                return;
+              }
 
               const response = await fetch(
                 `${API_URL}/api/bookings/partner/${mobile}/${bookingId}/status`,
@@ -112,65 +116,30 @@ export default function PartnerBookingsScreen() {
                   },
                   body: JSON.stringify({
                     status: "CANCELLED",
+                    reason: "SALON_CANCELLED",
                   }),
                 },
               );
 
               const data = await response.json();
 
-              if (response.ok) {
-                await loadBookings();
-              } else {
-                console.log("Reject Booking Error:", data);
+              if (!response.ok) {
+                Alert.alert(
+                  "Error",
+                  data.message || "Unable to cancel booking.",
+                );
+                return;
               }
-            } catch (error) {
-              console.error("Reject Booking Error:", error);
-            }
-          },
-        },
-      ],
-    );
-  };
 
-  const handleAccept = (bookingId: string) => {
-    Alert.alert(
-      "Accept Booking",
-      "Are you sure you want to accept this booking?",
-      [
-        {
-          text: "Cancel",
-          style: "cancel",
-        },
-        {
-          text: "OK",
-          onPress: async () => {
-            try {
-              const mobile = await AsyncStorage.getItem("partnerMobile");
-
-              if (!mobile) return;
-
-              const response = await fetch(
-                `${API_URL}/api/bookings/partner/${mobile}/${bookingId}/status`,
-                {
-                  method: "PATCH",
-                  headers: {
-                    "Content-Type": "application/json",
-                  },
-                  body: JSON.stringify({
-                    status: "ACCEPTED",
-                  }),
-                },
+              Alert.alert(
+                "Booking Cancelled",
+                "The appointment has been cancelled by the salon.",
               );
 
-              const data = await response.json();
-
-              if (response.ok) {
-                await loadBookings();
-              } else {
-                console.log("Accept Booking Error:", data);
-              }
+              await loadBookings();
             } catch (error) {
-              console.error("Accept Booking Error:", error);
+              console.error("Cancel Booking Error:", error);
+              Alert.alert("Error", "Unable to cancel booking.");
             }
           },
         },
@@ -278,7 +247,7 @@ export default function PartnerBookingsScreen() {
 
         {/* Tabs */}
         <View style={styles.tabs}>
-          {["Pending", "Confirmed", "Completed", "Rejected"].map((tab) => (
+          {["Confirmed", "Completed", "Rejected"].map((tab) => (
             <TouchableOpacity
               key={tab}
               style={[styles.tab, selectedTab === tab && styles.activeTab]}
@@ -297,108 +266,13 @@ export default function PartnerBookingsScreen() {
           ))}
         </View>
 
-        {/* Pending Booking */}
-        {selectedTab === "Pending" && (
-          <>
-            {bookings.filter((booking) => booking.status === "PENDING")
-              .length === 0 ? (
-              <View style={styles.emptyBookingCard}>
-                <Text style={styles.emptyBookingText}>No pending bookings</Text>
-              </View>
-            ) : (
-              bookings
-                .filter((booking) => booking.status === "PENDING")
-                .map((booking) => {
-                  const firstService = booking.bookingServices?.[0]?.service;
-
-                  return (
-                    <View key={booking.id} style={styles.bookingCard}>
-                      <View style={styles.cardHeader}>
-                        <View>
-                          <Text style={styles.customerName}>
-                            {booking.customer?.name || "Customer"}
-                          </Text>
-
-                          <Text style={styles.bookingId}>
-                            Booking ID: {booking.bookingId}
-                          </Text>
-                        </View>
-
-                        <View style={styles.pendingBadge}>
-                          <Text style={styles.pendingText}>Pending</Text>
-                        </View>
-                      </View>
-
-                      <View style={styles.divider} />
-
-                      <View style={styles.detailRow}>
-                        <Text style={styles.detailLabel}>Service</Text>
-                        <Text style={styles.detailValue}>
-                          {firstService?.name || "Service"}
-                        </Text>
-                      </View>
-
-                      <View style={styles.detailRow}>
-                        <Text style={styles.detailLabel}>Date</Text>
-                        <Text style={styles.detailValue}>
-                          {new Date(booking.date).toLocaleDateString("en-GB", {
-                            day: "2-digit",
-                            month: "short",
-                            year: "numeric",
-                          })}
-                        </Text>
-                      </View>
-
-                      <View style={styles.detailRow}>
-                        <Text style={styles.detailLabel}>Time</Text>
-                        <Text style={styles.detailValue}>{booking.time}</Text>
-                      </View>
-
-                      <View style={styles.detailRow}>
-                        <Text style={styles.detailLabel}>Staff</Text>
-                        <Text style={styles.detailValue}>
-                          {booking.staff?.name || "Not assigned"}
-                        </Text>
-                      </View>
-
-                      <View style={styles.detailRow}>
-                        <Text style={styles.detailLabel}>Amount</Text>
-                        <Text style={styles.amount}>
-                          ₹
-                          {Number(booking.amount || 0) -
-                            Number(booking.discount || 0)}
-                        </Text>
-                      </View>
-
-                      <View style={styles.buttonRow}>
-                        <TouchableOpacity
-                          style={styles.rejectButton}
-                          activeOpacity={0.8}
-                          onPress={() => handleReject(booking.bookingId)}
-                        >
-                          <Text style={styles.rejectText}>Reject</Text>
-                        </TouchableOpacity>
-
-                        <TouchableOpacity
-                          style={styles.acceptButton}
-                          activeOpacity={0.8}
-                          onPress={() => handleAccept(booking.bookingId)}
-                        >
-                          <Text style={styles.acceptText}>Accept Booking</Text>
-                        </TouchableOpacity>
-                      </View>
-                    </View>
-                  );
-                })
-            )}
-          </>
-        )}
-
         {/* Confirmed Bookings */}
         {selectedTab === "Confirmed" && (
           <>
             {bookings.filter((booking) =>
-              ["ACCEPTED", "ARRIVED", "STARTED"].includes(booking.status),
+              ["CONFIRMED", "ACCEPTED", "ARRIVED", "STARTED"].includes(
+                booking.status?.toUpperCase(),
+              ),
             ).length === 0 ? (
               <View style={styles.emptyBookingCard}>
                 <Text style={styles.emptyBookingText}>
@@ -408,7 +282,9 @@ export default function PartnerBookingsScreen() {
             ) : (
               bookings
                 .filter((booking) =>
-                  ["ACCEPTED", "ARRIVED", "STARTED"].includes(booking.status),
+                  ["CONFIRMED", "ACCEPTED", "ARRIVED", "STARTED"].includes(
+                    booking.status?.toUpperCase(),
+                  ),
                 )
                 .map((booking) => {
                   const firstService = booking.bookingServices?.[0]?.service;
@@ -472,22 +348,49 @@ export default function PartnerBookingsScreen() {
                         </Text>
                       </View>
 
-                      <TouchableOpacity
-                        style={styles.manageButton}
-                        activeOpacity={0.8}
-                        onPress={() =>
-                          router.push({
-                            pathname: "/partner/booking-details",
-                            params: {
-                              bookingId: booking.bookingId,
-                            },
-                          })
-                        }
+                      <View
+                        style={{ flexDirection: "row", gap: 10, marginTop: 6 }}
                       >
-                        <Text style={styles.manageText}>
-                          Manage Appointment
-                        </Text>
-                      </TouchableOpacity>
+                        {booking.status?.toUpperCase() === "CONFIRMED" && (
+                          <TouchableOpacity
+                            style={[
+                              styles.manageButton,
+                              {
+                                flex: 1,
+                                marginTop: 0,
+                                backgroundColor: "#DC2626",
+                              },
+                            ]}
+                            activeOpacity={0.8}
+                            onPress={() =>
+                              handleCancelBooking(booking.bookingId)
+                            }
+                          >
+                            <Text style={styles.manageText}>
+                              Cancel Booking
+                            </Text>
+                          </TouchableOpacity>
+                        )}
+                        <TouchableOpacity
+                          style={[
+                            styles.manageButton,
+                            { flex: 1, marginTop: 0 },
+                          ]}
+                          activeOpacity={0.8}
+                          onPress={() =>
+                            router.push({
+                              pathname: "/partner/booking-details",
+                              params: {
+                                bookingId: booking.bookingId,
+                              },
+                            })
+                          }
+                        >
+                          <Text style={styles.manageText}>
+                            Manage Appointment
+                          </Text>
+                        </TouchableOpacity>
+                      </View>
                     </View>
                   );
                 })
@@ -609,8 +512,8 @@ export default function PartnerBookingsScreen() {
                           <Text style={styles.rejectedText}>
                             {booking.cancelReason === "NOT_ARRIVED"
                               ? "Not Arrived"
-                              : booking.cancelReason === "SALON_NOT_ACCEPTED"
-                                ? "Salon Not Accepted"
+                              : booking.cancelReason === "SALON_CANCELLED"
+                                ? "Cancelled by Salon"
                                 : booking.cancelReason === "Admin cancelled"
                                   ? "Rejected by Admin"
                                   : "Rejected"}
@@ -769,19 +672,6 @@ const styles = StyleSheet.create({
 
   /* Badges */
 
-  pendingBadge: {
-    backgroundColor: "#FFF4D8",
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 15,
-  },
-
-  pendingText: {
-    fontSize: 11,
-    fontWeight: "700",
-    color: "#B07A00",
-  },
-
   confirmedBadge: {
     backgroundColor: "#E8F7ED",
     paddingHorizontal: 10,
@@ -850,45 +740,6 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: "800",
     color: "#5B3CC4",
-  },
-
-  /* Pending Buttons */
-
-  buttonRow: {
-    flexDirection: "row",
-    gap: 10,
-    marginTop: 8,
-  },
-
-  rejectButton: {
-    flex: 1,
-    height: 48,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: "#E0D5E8",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-
-  rejectText: {
-    fontSize: 13,
-    fontWeight: "700",
-    color: "#D64545",
-  },
-
-  acceptButton: {
-    flex: 1.4,
-    height: 48,
-    borderRadius: 12,
-    backgroundColor: "#5B3CC4",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-
-  acceptText: {
-    fontSize: 13,
-    fontWeight: "700",
-    color: "#FFFFFF",
   },
 
   /* Manage */

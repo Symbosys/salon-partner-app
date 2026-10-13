@@ -53,7 +53,7 @@ export default function BookingDetailsScreen() {
 
       setBooking(data);
       setStatus(
-        data.status === "ACCEPTED"
+        data.status === "CONFIRMED" || data.status === "ACCEPTED"
           ? "Confirmed"
           : data.status === "ARRIVED"
             ? "Customer Arrived"
@@ -62,7 +62,7 @@ export default function BookingDetailsScreen() {
               : data.status === "COMPLETED"
                 ? "Completed"
                 : data.status === "CANCELLED"
-                  ? "Rejected"
+                  ? "Cancelled"
                   : "Pending",
       );
     } catch (error) {
@@ -84,45 +84,6 @@ export default function BookingDetailsScreen() {
       return () => clearInterval(interval);
     }, [bookingId]),
   );
-
-  const handleAccept = async () => {
-    try {
-      const mobile = await AsyncStorage.getItem("partnerMobile");
-
-      if (!mobile || !bookingId) {
-        Alert.alert("Error", "Booking information not found.");
-        return;
-      }
-
-      const response = await fetch(
-        `${API_URL}/api/bookings/partner/${mobile}/${bookingId}/status`,
-        {
-          method: "PATCH",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            status: "ACCEPTED",
-          }),
-        },
-      );
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        Alert.alert("Error", data.message || "Unable to accept booking.");
-        return;
-      }
-
-      setStatus("Confirmed");
-      setBooking(data.booking);
-
-      Alert.alert("Success", "Booking confirmed successfully.");
-    } catch (error) {
-      console.error("Accept Booking Error:", error);
-      Alert.alert("Error", "Unable to confirm booking.");
-    }
-  };
 
   const verifyCustomerQR = async (qrCode: string) => {
     try {
@@ -328,7 +289,7 @@ export default function BookingDetailsScreen() {
                     ? styles.startedBadge
                     : status === "Completed"
                       ? styles.completedBadge
-                      : status === "Rejected"
+                      : status === "Cancelled" || status === "Rejected"
                         ? styles.rejectedBadge
                         : styles.pendingBadge,
             ]}
@@ -344,7 +305,7 @@ export default function BookingDetailsScreen() {
                       ? styles.startedText
                       : status === "Completed"
                         ? styles.completedText
-                        : status === "Rejected"
+                        : status === "Cancelled" || status === "Rejected"
                           ? styles.rejectedText
                           : styles.pendingText,
               ]}
@@ -433,87 +394,7 @@ export default function BookingDetailsScreen() {
 
         {/* Actions */}
 
-        {/* Pending */}
-        {status === "Pending" ? (
-          <View style={styles.actionContainer}>
-            <TouchableOpacity
-              style={styles.rejectButton}
-              onPress={() => {
-                Alert.alert(
-                  "Reject Booking",
-                  "Are you sure you want to reject this booking?",
-                  [
-                    {
-                      text: "Cancel",
-                      style: "cancel",
-                    },
-                    {
-                      text: "OK",
-                      onPress: async () => {
-                        try {
-                          const mobile =
-                            await AsyncStorage.getItem("partnerMobile");
-
-                          if (!mobile || !bookingId) {
-                            Alert.alert(
-                              "Error",
-                              "Booking information not found.",
-                            );
-                            return;
-                          }
-
-                          const response = await fetch(
-                            `${API_URL}/api/bookings/partner/${mobile}/${bookingId}/status`,
-                            {
-                              method: "PATCH",
-                              headers: {
-                                "Content-Type": "application/json",
-                              },
-                              body: JSON.stringify({
-                                status: "CANCELLED",
-                              }),
-                            },
-                          );
-
-                          const data = await response.json();
-
-                          if (!response.ok) {
-                            Alert.alert(
-                              "Error",
-                              data.message || "Unable to reject booking.",
-                            );
-                            return;
-                          }
-
-                          setStatus("Rejected");
-                          setBooking(data.booking);
-
-                          Alert.alert(
-                            "Success",
-                            "Booking rejected successfully.",
-                          );
-                        } catch (error) {
-                          console.error("Reject Booking Error:", error);
-                          Alert.alert("Error", "Unable to reject booking.");
-                        }
-                      },
-                    },
-                  ],
-                );
-              }}
-            >
-              <Text style={styles.rejectText}>Reject</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={styles.acceptButton}
-              onPress={handleAccept}
-            >
-              <Text style={styles.acceptText}>Accept Booking</Text>
-            </TouchableOpacity>
-          </View>
-        ) : status === "Confirmed" ? (
-          /* Confirmed */
+        {status === "Confirmed" ? (
           <View style={styles.confirmedCard}>
             <Text style={styles.confirmedTitle}>Appointment Confirmed</Text>
 
@@ -556,7 +437,7 @@ export default function BookingDetailsScreen() {
                   }
 
                   setStatus("Customer Arrived");
-                  setBooking(data.booking);
+                  await loadBooking();
                 } catch (error) {
                   console.error("Customer Arrived Error:", error);
                   Alert.alert("Error", "Unable to update booking status.");
@@ -565,18 +446,96 @@ export default function BookingDetailsScreen() {
             >
               <Text style={styles.manageText}>Customer Arrived</Text>
             </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[
+                styles.manageButton,
+                { backgroundColor: "#DC2626", marginTop: 10 },
+              ]}
+              onPress={() => {
+                Alert.alert(
+                  "Cancel Booking",
+                  "Are you sure you want to cancel this appointment?",
+                  [
+                    {
+                      text: "Keep Booking",
+                      style: "cancel",
+                    },
+                    {
+                      text: "Cancel Booking",
+                      style: "destructive",
+                      onPress: async () => {
+                        try {
+                          const mobile =
+                            await AsyncStorage.getItem("partnerMobile");
+
+                          if (!mobile || !bookingId) {
+                            Alert.alert(
+                              "Error",
+                              "Booking information not found.",
+                            );
+                            return;
+                          }
+
+                          const response = await fetch(
+                            `${API_URL}/api/bookings/partner/${mobile}/${bookingId}/status`,
+                            {
+                              method: "PATCH",
+                              headers: {
+                                "Content-Type": "application/json",
+                              },
+                              body: JSON.stringify({
+                                status: "CANCELLED",
+                                reason: "SALON_CANCELLED",
+                              }),
+                            },
+                          );
+
+                          const data = await response.json();
+
+                          if (!response.ok) {
+                            Alert.alert(
+                              "Error",
+                              data.message || "Unable to cancel booking.",
+                            );
+                            return;
+                          }
+
+                          setStatus("Cancelled");
+                          await loadBooking();
+
+                          Alert.alert(
+                            "Booking Cancelled",
+                            "The appointment has been cancelled by the salon.",
+                          );
+                        } catch (error) {
+                          console.error("Cancel Booking Error:", error);
+                          Alert.alert("Error", "Unable to cancel booking.");
+                        }
+                      },
+                    },
+                  ],
+                );
+              }}
+            >
+              <Text style={styles.manageText}>Cancel Booking</Text>
+            </TouchableOpacity>
           </View>
-        ) : status === "Rejected" ? (
-          /* Rejected */
+        ) : status === "Cancelled" || status === "Rejected" ? (
           <View style={styles.rejectedCard}>
-            <Text style={styles.rejectedTitle}>Booking Rejected</Text>
+            <Text style={styles.rejectedTitle}>
+              {status === "Cancelled"
+                ? "Booking Cancelled"
+                : "Booking Rejected"}
+            </Text>
 
             <Text style={styles.rejectedDescription}>
-              This appointment has been rejected.
+              {status === "Cancelled"
+                ? "This appointment was cancelled by the salon."
+                : "This appointment has been rejected."}
             </Text>
           </View>
         ) : status === "Customer Arrived" ? (
-          /* Customer Arrived */
           <View style={styles.arrivedCard}>
             <Text style={styles.arrivedTitle}>Customer Arrived</Text>
 
@@ -619,7 +578,7 @@ export default function BookingDetailsScreen() {
                   }
 
                   setStatus("Service Started");
-                  setBooking(data.booking);
+                  await loadBooking();
                 } catch (error) {
                   console.error("Start Service Error:", error);
                   Alert.alert("Error", "Unable to start service.");
@@ -630,7 +589,6 @@ export default function BookingDetailsScreen() {
             </TouchableOpacity>
           </View>
         ) : status === "Service Started" ? (
-          /* Service Started */
           <View style={styles.startedCard}>
             <Text style={styles.startedTitle}>Service Started</Text>
 
@@ -642,7 +600,15 @@ export default function BookingDetailsScreen() {
               style={styles.completeServiceButton}
               onPress={async () => {
                 if (!permission?.granted) {
-                  await requestPermission();
+                  const result = await requestPermission();
+
+                  if (!result.granted) {
+                    Alert.alert(
+                      "Camera Permission",
+                      "Camera permission is required to scan the customer's QR code.",
+                    );
+                    return;
+                  }
                 }
 
                 setScanned(false);
@@ -652,8 +618,7 @@ export default function BookingDetailsScreen() {
               <Text style={styles.completeServiceText}>Scan Customer QR</Text>
             </TouchableOpacity>
           </View>
-        ) : (
-          /* Completed */
+        ) : status === "Completed" ? (
           <View style={styles.completedCard}>
             <Text style={styles.completedTitle}>Service Completed</Text>
 
@@ -661,7 +626,7 @@ export default function BookingDetailsScreen() {
               The customer's service has been completed successfully.
             </Text>
           </View>
-        )}
+        ) : null}
       </ScrollView>
     </SafeAreaView>
   );
