@@ -45,6 +45,8 @@ export default function PartnerRegistrationScreen() {
   const [state, setState] = useState("");
   const [pincode, setPincode] = useState("");
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [saving, setSaving] = useState(false);
+  const [isNextLoading, setIsNextLoading] = useState(false);
   const [latitude, setLatitude] = useState<number | null>(null);
   const [longitude, setLongitude] = useState<number | null>(null);
 
@@ -556,34 +558,43 @@ export default function PartnerRegistrationScreen() {
   };
 
   const handleNext = async () => {
-    if (!validateCurrentStep()) {
-      return;
-    }
+    if (isNextLoading) return;
 
-    // Step 2 -> Step 3
-    if (currentStep === 2) {
-      const locationSuccess = await getCurrentLocation();
+    setIsNextLoading(true);
 
-      if (!locationSuccess) {
+    try {
+      if (!validateCurrentStep()) {
         return;
       }
-      setCurrentStep(3);
-      setErrors({});
-      return;
-    }
 
-    // Step 1 -> Step 2
-    if (currentStep === 1) {
-      setCurrentStep(2);
-      setErrors({});
-      return;
-    }
+      // Step 2 -> Step 3
+      if (currentStep === 2) {
+        const locationSuccess = await getCurrentLocation();
 
-    // Step 3 -> Step 4
-    if (currentStep === 3) {
-      setCurrentStep(4);
-      setErrors({});
-      return;
+        if (!locationSuccess) {
+          return;
+        }
+
+        setCurrentStep(3);
+        setErrors({});
+        return;
+      }
+
+      // Step 1 -> Step 2
+      if (currentStep === 1) {
+        setCurrentStep(2);
+        setErrors({});
+        return;
+      }
+
+      // Step 3 -> Step 4
+      if (currentStep === 3) {
+        setCurrentStep(4);
+        setErrors({});
+        return;
+      }
+    } finally {
+      setIsNextLoading(false);
     }
   };
 
@@ -595,9 +606,13 @@ export default function PartnerRegistrationScreen() {
   };
 
   const handleSubmit = async () => {
+    if (saving) return;
+
     if (!validateForm()) {
       return;
     }
+
+    setSaving(true);
 
     try {
       const mobile = mobileNumber.trim();
@@ -662,7 +677,7 @@ export default function PartnerRegistrationScreen() {
             return;
           }
           await registerForPushNotificationsAsync();
-          router.push("/partner/verification" as any);
+          router.replace("/partner/verification" as any);
           return;
         }
       }
@@ -714,7 +729,7 @@ export default function PartnerRegistrationScreen() {
         console.error("Partner ID missing in registration response:", data);
       }
 
-      router.push("/partner/verification" as any);
+      router.replace("/partner/verification" as any);
     } catch (error) {
       console.error("Registration Error:", error);
 
@@ -722,6 +737,8 @@ export default function PartnerRegistrationScreen() {
         ...prev,
         submit: "Unable to connect to server",
       }));
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -1164,7 +1181,7 @@ export default function PartnerRegistrationScreen() {
         )}
 
         {/* Navigation / Submit */}
-        {Object.keys(errors).length > 0 && (
+        {Object.values(errors).some((error) => error !== "") && (
           <Text style={styles.formErrorText}>
             {errors.submit || "Please fill all required fields correctly."}
           </Text>
@@ -1189,16 +1206,23 @@ export default function PartnerRegistrationScreen() {
               ]}
               activeOpacity={0.8}
               onPress={handleNext}
+              disabled={isNextLoading}
             >
-              <Text style={styles.nextButtonText}>Next</Text>
+              <Text style={styles.nextButtonText}>
+                {isNextLoading ? "Please wait..." : "Next"}
+              </Text>
             </TouchableOpacity>
           ) : (
             <TouchableOpacity
               style={styles.nextButton}
               activeOpacity={0.8}
               onPress={handleSubmit}
+              disabled={saving}
             >
-              <Text style={styles.nextButtonText}>Submit for Verification</Text>
+              <Text style={styles.nextButtonText}>
+                {" "}
+                {saving ? "Submitting..." : "Submit for Verification"}
+              </Text>
             </TouchableOpacity>
           )}
         </View>
