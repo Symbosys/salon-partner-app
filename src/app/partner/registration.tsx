@@ -1,3 +1,4 @@
+import { API_URL } from "@/constants/api";
 import { registerForPushNotificationsAsync } from "@/services/notifications";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import Constants from "expo-constants";
@@ -17,16 +18,12 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-
-import { API_URL } from "@/constants/api";
 const GOOGLE_MAPS_API_KEY =
   Constants.expoConfig?.extra?.googleMapsWebApiKey || "";
-
 export default function PartnerRegistrationScreen() {
   const router = useRouter();
   const [selectedCategory, setSelectedCategory] = useState("");
   const [currentStep, setCurrentStep] = useState(1);
-  // const [draftLoaded, setDraftLoaded] = useState(false);
   const [aadhaarNumber, setAadhaarNumber] = useState("");
   const [panNumber, setPanNumber] = useState("");
   const [salonImage, setSalonImage] = useState<string | null>(null);
@@ -35,7 +32,6 @@ export default function PartnerRegistrationScreen() {
   );
   const [aadhaarDocument, setAadhaarDocument] = useState<string | null>(null);
   const [panDocument, setPanDocument] = useState<string | null>(null);
-
   const [salonName, setSalonName] = useState("");
   const [ownerName, setOwnerName] = useState("");
   const [mobileNumber, setMobileNumber] = useState("");
@@ -49,12 +45,10 @@ export default function PartnerRegistrationScreen() {
   const [isNextLoading, setIsNextLoading] = useState(false);
   const [latitude, setLatitude] = useState<number | null>(null);
   const [longitude, setLongitude] = useState<number | null>(null);
-
   useEffect(() => {
     const loadPartnerMobile = async () => {
       try {
         const savedMobile = await AsyncStorage.getItem("partnerMobile");
-
         if (savedMobile) {
           setMobileNumber(savedMobile);
         }
@@ -62,10 +56,8 @@ export default function PartnerRegistrationScreen() {
         console.error("Load Partner Mobile Error:", error);
       }
     };
-
     loadPartnerMobile();
   }, []);
-
   const pickSalonImage = async () => {
     try {
       const result = await ImagePicker.launchImageLibraryAsync({
@@ -74,19 +66,11 @@ export default function PartnerRegistrationScreen() {
         aspect: [4, 3],
         quality: 0.8,
       });
-
       if (!result.canceled) {
         const fileUri = result.assets[0].uri;
-
-        // Show selected image immediately
         setSalonImagePreview(fileUri);
-
-        // Upload image to backend
         const uploadedUrl = await uploadSalonImage(fileUri);
-
-        // Save backend URL for registration
         setSalonImage(uploadedUrl);
-
         setErrors((prev) => ({
           ...prev,
           salonImage: "",
@@ -94,22 +78,17 @@ export default function PartnerRegistrationScreen() {
       }
     } catch (error) {
       console.error("Salon Image Selection/Upload Error:", error);
-
       setErrors((prev) => ({
         ...prev,
         salonImage: "Salon image upload failed. Please try again.",
       }));
     }
   };
-
   const uploadKycImage = async (uri: string) => {
     try {
       const fileName = uri.split("/").pop() || `kyc-${Date.now()}.jpg`;
-
       const extension = fileName.split(".").pop()?.toLowerCase() || "jpg";
-
       const mimeType = extension === "png" ? "image/png" : "image/jpeg";
-
       const result = await FileSystem.uploadAsync(
         `${API_URL}/api/uploads/kyc`,
         uri,
@@ -120,35 +99,26 @@ export default function PartnerRegistrationScreen() {
           mimeType,
         },
       );
-
       console.log("KYC Image Upload Response:", result.status, result.body);
-
       const data = JSON.parse(result.body);
-
       if (result.status < 200 || result.status >= 300) {
         throw new Error(data?.message || "KYC image upload failed");
       }
-
       return data.url?.startsWith("http")
         ? data.url
         : `${API_URL}${data.url?.startsWith("/") ? "" : "/"}${data.url}`;
     } catch (error: any) {
       console.error("KYC Image Upload Error:", error);
-
       throw new Error(
         error?.message || "KYC image upload failed. Please try again.",
       );
     }
   };
-
   const uploadSalonImage = async (uri: string) => {
     try {
       const fileName = uri.split("/").pop() || `salon-${Date.now()}.jpg`;
-
       const extension = fileName.split(".").pop()?.toLowerCase() || "jpg";
-
       const mimeType = extension === "png" ? "image/png" : "image/jpeg";
-
       const result = await FileSystem.uploadAsync(
         `${API_URL}/api/uploads/kyc`,
         uri,
@@ -159,141 +129,111 @@ export default function PartnerRegistrationScreen() {
           mimeType,
         },
       );
-
       console.log("Salon Image Upload Response:", result.status, result.body);
-
       let data: any = {};
-
       try {
         data = JSON.parse(result.body);
       } catch {
         data = {};
       }
-
       if (result.status < 200 || result.status >= 300) {
         throw new Error(data?.message || "Salon image upload failed");
       }
-
       return data.url?.startsWith("http")
         ? data.url
         : `${API_URL}${data.url?.startsWith("/") ? "" : "/"}${data.url}`;
     } catch (error: any) {
       console.error("Salon Image Upload Error:", error);
-
       throw new Error(
         error?.message || "Salon image upload failed. Please try again.",
       );
     }
   };
-
   const pickDocument = async (type: "aadhaar" | "pan") => {
     const field = type === "aadhaar" ? "aadhaarDocument" : "panDocument";
-
     try {
       const result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ["images"],
         allowsEditing: true,
         quality: 0.8,
       });
-
       if (result.canceled) {
         return;
       }
-
       const asset = result.assets[0];
-
       console.log("Selected KYC image:", asset.uri);
-
-      // Upload using the same working ImagePicker upload flow
       const uploadedUrl = await uploadKycImage(asset.uri);
-
       if (type === "aadhaar") {
         setAadhaarDocument(uploadedUrl);
       } else {
         setPanDocument(uploadedUrl);
       }
-
       setErrors((prev) => ({
         ...prev,
         [field]: "",
       }));
     } catch (error: any) {
       console.error(`${type} Image Upload Error:`, error);
-
       setErrors((prev) => ({
         ...prev,
         [field]: error?.message || "Document upload failed. Please try again.",
       }));
     }
   };
-
   const getFieldError = (field: string, value: string) => {
     switch (field) {
       case "salonName":
         return !value.trim() ? "Salon name is required" : "";
-
       case "ownerName":
         return !value.trim() ? "Owner name is required" : "";
-
       case "email":
         if (!value.trim()) return "Email address is required";
         if (!/^\S+@\S+\.\S+$/.test(value.trim())) {
           return "Enter a valid email address";
         }
         return "";
-
       case "address":
         return !value.trim() ? "Address is required" : "";
-
       case "city":
         return !value.trim() ? "City is required" : "";
-
       case "state":
         return !value.trim() ? "State is required" : "";
-
       case "pincode":
         if (!value.trim()) return "Pincode is required";
         if (!/^\d{6}$/.test(value.trim())) {
           return "Enter a valid 6-digit pincode";
         }
         return "";
-
       case "aadhaarNumber":
         if (!value.trim()) return "Aadhaar number is required";
         if (!/^\d{12}$/.test(value.trim())) {
           return "Enter a valid 12-digit Aadhaar number";
         }
         return "";
-
       case "panNumber":
         if (!value.trim()) return "PAN number is required";
         if (!/^[A-Z0-9]{10}$/.test(value.trim().toUpperCase())) {
           return "PAN must be 10 alphanumeric characters";
         }
         return "";
-
       default:
         return "";
     }
   };
-
   const validateField = (field: string, value: string) => {
     setErrors((prev) => ({
       ...prev,
       [field]: getFieldError(field, value),
     }));
   };
-
   const validateCurrentStep = () => {
     const newErrors: Record<string, string> = {};
-
     if (currentStep === 1) {
       const fields: [string, string][] = [
         ["salonName", salonName],
         ["ownerName", ownerName],
         ["email", email],
       ];
-
       fields.forEach(([field, value]) => {
         const error = getFieldError(field, value);
         if (error) {
@@ -301,17 +241,14 @@ export default function PartnerRegistrationScreen() {
         }
       });
     }
-
     if (currentStep === 2) {
       if (!salonImage) {
         newErrors.salonImage = "Salon image is required";
       }
-
       if (!selectedCategory) {
         newErrors.category = "Select salon type";
       }
     }
-
     if (currentStep === 3) {
       const fields: [string, string][] = [
         ["address", address],
@@ -319,7 +256,6 @@ export default function PartnerRegistrationScreen() {
         ["state", state],
         ["pincode", pincode],
       ];
-
       fields.forEach(([field, value]) => {
         const error = getFieldError(field, value);
         if (error) {
@@ -327,37 +263,29 @@ export default function PartnerRegistrationScreen() {
         }
       });
     }
-
     if (currentStep === 4) {
       const fields: [string, string][] = [
         ["aadhaarNumber", aadhaarNumber],
         ["panNumber", panNumber],
       ];
-
       fields.forEach(([field, value]) => {
         const error = getFieldError(field, value);
         if (error) {
           newErrors[field] = error;
         }
       });
-
       if (!aadhaarDocument) {
         newErrors.aadhaarDocument = "Aadhaar document is required";
       }
-
       if (!panDocument) {
         newErrors.panDocument = "PAN document is required";
       }
     }
-
     setErrors(newErrors);
-
     return Object.keys(newErrors).length === 0;
   };
-
   const validateForm = () => {
     const newErrors: Record<string, string> = {};
-
     const fields: [string, string][] = [
       ["salonName", salonName],
       ["ownerName", ownerName],
@@ -369,12 +297,10 @@ export default function PartnerRegistrationScreen() {
       ["aadhaarNumber", aadhaarNumber],
       ["panNumber", panNumber],
     ];
-
     fields.forEach(([field, value]) => {
       const error = getFieldError(field, value);
       if (error) newErrors[field] = error;
     });
-
     if (!selectedCategory) newErrors.category = "Select salon type";
     if (!salonImage) newErrors.salonImage = "Salon image is required";
     if (!aadhaarDocument) {
@@ -383,74 +309,53 @@ export default function PartnerRegistrationScreen() {
     if (!panDocument) {
       newErrors.panDocument = "PAN document is required";
     }
-
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
-
   const fetchAddressFromCoordinates = async (
     latitudeValue: number,
     longitudeValue: number,
   ) => {
     try {
       console.log("Fetching address for:", latitudeValue, longitudeValue);
-
       const response = await fetch(
         `${API_URL}/api/salons/reverse-geocode?latitude=${latitudeValue}&longitude=${longitudeValue}`,
       );
-
       const data = await response.json();
-
       console.log("Ola Reverse Geocode Response:", response.status, data);
-
       if (!response.ok) {
         console.error("Ola Reverse Geocode Failed:", data);
         return;
       }
-
       const result = data?.results?.[0];
-
       if (!result) {
         console.warn("No address result returned from Ola Maps");
         return;
       }
-
       const components = result.address_components || [];
-
       const getComponent = (type: string) => {
         const component = components.find((item: any) =>
           item.types?.includes(type),
         );
-
         return component?.long_name || "";
       };
-
       const detectedCity =
         getComponent("locality") ||
         getComponent("administrative_area_level_2") ||
         "";
-
       const detectedState = getComponent("administrative_area_level_1");
-
       const detectedPincode = getComponent("postal_code");
-
-      // IMPORTANT:
-      // Use Ola Maps complete formatted address.
-      // Do not manually build address from components.
       const actualAddress = result.formatted_address || "Selected location";
-
       console.log("========== OLA LOCATION ==========");
       console.log("Formatted Address:", actualAddress);
       console.log("City:", detectedCity);
       console.log("State:", detectedState);
       console.log("Pincode:", detectedPincode);
       console.log("==================================");
-
       setAddress(actualAddress);
       setCity(detectedCity);
       setState(detectedState);
       setPincode(detectedPincode);
-
       setErrors((prev) => ({
         ...prev,
         address: "",
@@ -463,18 +368,13 @@ export default function PartnerRegistrationScreen() {
       console.error("Fetch Address From Coordinates Error:", error);
     }
   };
-
   const getCurrentLocation = async () => {
     try {
-      // Check current permission
       let permission = await Location.getForegroundPermissionsAsync();
-
-      // Permission not granted yet
       if (permission.status !== "granted") {
         if (permission.canAskAgain) {
           const requestedPermission =
             await Location.requestForegroundPermissionsAsync();
-
           if (requestedPermission.status !== "granted") {
             Alert.alert(
               "Location Permission Required",
@@ -492,10 +392,8 @@ export default function PartnerRegistrationScreen() {
                 },
               ],
             );
-
             return false;
           }
-
           permission = requestedPermission;
         } else {
           Alert.alert(
@@ -512,36 +410,25 @@ export default function PartnerRegistrationScreen() {
               },
             ],
           );
-
           return false;
         }
       }
-
-      // Get current location
       const currentLocation = await Location.getCurrentPositionAsync({
         accuracy: Location.Accuracy.High,
       });
-
       const currentLatitude = currentLocation.coords.latitude;
       const currentLongitude = currentLocation.coords.longitude;
-
       setLatitude(currentLatitude);
       setLongitude(currentLongitude);
-
       setErrors((prev) => ({
         ...prev,
         location: "",
       }));
-
       console.log("Current Location:", currentLatitude, currentLongitude);
-
-      // Fetch address automatically from Ola Maps
       await fetchAddressFromCoordinates(currentLatitude, currentLongitude);
-
       return true;
     } catch (error) {
       console.log("Location unavailable:", error);
-
       Alert.alert(
         "Location Unavailable",
         "We couldn't determine your current location. Please make sure Location Services are enabled on your device and try again.",
@@ -552,42 +439,30 @@ export default function PartnerRegistrationScreen() {
           },
         ],
       );
-
       return false;
     }
   };
-
   const handleNext = async () => {
     if (isNextLoading) return;
-
     setIsNextLoading(true);
-
     try {
       if (!validateCurrentStep()) {
         return;
       }
-
-      // Step 2 -> Step 3
       if (currentStep === 2) {
         const locationSuccess = await getCurrentLocation();
-
         if (!locationSuccess) {
           return;
         }
-
         setCurrentStep(3);
         setErrors({});
         return;
       }
-
-      // Step 1 -> Step 2
       if (currentStep === 1) {
         setCurrentStep(2);
         setErrors({});
         return;
       }
-
-      // Step 3 -> Step 4
       if (currentStep === 3) {
         setCurrentStep(4);
         setErrors({});
@@ -597,47 +472,33 @@ export default function PartnerRegistrationScreen() {
       setIsNextLoading(false);
     }
   };
-
   const handleBack = () => {
     if (currentStep > 1) {
       setCurrentStep((prev) => prev - 1);
       setErrors({});
     }
   };
-
   const handleSubmit = async () => {
     if (saving) return;
-
     if (!validateForm()) {
       return;
     }
-
     setSaving(true);
-
     try {
       const mobile = mobileNumber.trim();
-
-      // Check existing partner/salon
       const statusResponse = await fetch(
         `${API_URL}/api/salons/partner/${mobile}`,
       );
-
       if (statusResponse.ok) {
         const statusData = await statusResponse.json();
         const existingSalon = statusData?.salon;
-
         const existingPartnerId = statusData?.partner?.id;
-
         if (existingPartnerId) {
           await AsyncStorage.setItem("partnerId", String(existingPartnerId));
-
           console.log("EXISTING PARTNER ID SAVED:", existingPartnerId);
         } else {
           console.log("Partner ID missing in status response:", statusData);
         }
-
-        // If existing application is rejected,
-        // update the same salon instead of creating a new one.
         if (existingSalon?.status === "REJECTED") {
           const response = await fetch(
             `${API_URL}/api/salons/partner/${mobile}/resubmit`,
@@ -666,9 +527,7 @@ export default function PartnerRegistrationScreen() {
               }),
             },
           );
-
           const data = await response.json();
-
           if (!response.ok) {
             setErrors((prev) => ({
               ...prev,
@@ -681,8 +540,6 @@ export default function PartnerRegistrationScreen() {
           return;
         }
       }
-
-      // Normal new registration
       const response = await fetch(`${API_URL}/api/salons`, {
         method: "POST",
         headers: {
@@ -707,9 +564,7 @@ export default function PartnerRegistrationScreen() {
           longitude,
         }),
       });
-
       const data = await response.json();
-
       if (!response.ok) {
         setErrors((prev) => ({
           ...prev,
@@ -717,22 +572,17 @@ export default function PartnerRegistrationScreen() {
         }));
         return;
       }
-
       const partnerId = data?.partner?.id;
-
       if (partnerId) {
         await AsyncStorage.setItem("partnerId", String(partnerId));
         console.log("PARTNER ID SAVED:", partnerId);
-
         await registerForPushNotificationsAsync();
       } else {
         console.error("Partner ID missing in registration response:", data);
       }
-
       router.replace("/partner/verification" as any);
     } catch (error) {
       console.error("Registration Error:", error);
-
       setErrors((prev) => ({
         ...prev,
         submit: "Unable to connect to server",
@@ -741,14 +591,12 @@ export default function PartnerRegistrationScreen() {
       setSaving(false);
     }
   };
-
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.content}
       >
-        {/* Header */}
         <View style={styles.header}>
           <View>
             <Text style={styles.title}>Partner Registration</Text>
@@ -757,31 +605,24 @@ export default function PartnerRegistrationScreen() {
             </Text>
           </View>
         </View>
-
-        {/* Progress */}
         <View style={styles.progressCard}>
           <View style={styles.progressTop}>
             <Text style={styles.progressTitle}>Registration & KYC</Text>
             <Text style={styles.progressCount}>Step {currentStep} of 4</Text>
           </View>
-
           <View style={styles.progressTrack}>
             <View
               style={[styles.progressFill, { width: `${currentStep * 25}%` }]}
             />
           </View>
         </View>
-
         {currentStep === 1 && (
           <>
-            {/* Salon Details */}
             <Text style={styles.sectionTitle}>Salon Details</Text>
-
             <View style={styles.card}>
               <Text style={styles.label}>
                 Salon Name <Text style={styles.required}>*</Text>
               </Text>
-
               <TextInput
                 style={styles.input}
                 placeholder="Enter salon name"
@@ -795,11 +636,9 @@ export default function PartnerRegistrationScreen() {
               {errors.salonName ? (
                 <Text style={styles.textFieldError}>{errors.salonName}</Text>
               ) : null}
-
               <Text style={styles.label}>
                 Owner Name <Text style={styles.required}>*</Text>
               </Text>
-
               <TextInput
                 style={styles.input}
                 placeholder="Enter owner name"
@@ -813,11 +652,9 @@ export default function PartnerRegistrationScreen() {
               {errors.ownerName ? (
                 <Text style={styles.textFieldError}>{errors.ownerName}</Text>
               ) : null}
-
               <Text style={styles.label}>
                 Email Address <Text style={styles.required}>*</Text>
               </Text>
-
               <TextInput
                 style={styles.input}
                 placeholder="Enter email address"
@@ -836,12 +673,9 @@ export default function PartnerRegistrationScreen() {
             </View>
           </>
         )}
-
         {currentStep === 2 && (
           <>
-            {/* Salon Image */}
             <Text style={styles.sectionTitle}>Salon Image</Text>
-
             <View style={styles.card}>
               <Text style={styles.label}>
                 Upload Salon Image <Text style={styles.required}>*</Text>
@@ -877,13 +711,9 @@ export default function PartnerRegistrationScreen() {
                 </TouchableOpacity>
               )}
             </View>
-
-            {/* Salon Category */}
             <Text style={styles.sectionTitle}>Salon Category</Text>
-
             <View style={styles.card}>
               <Text style={styles.label}>Select Salon Type</Text>
-
               <TouchableOpacity
                 style={[
                   styles.categoryOption,
@@ -907,7 +737,6 @@ export default function PartnerRegistrationScreen() {
                     <View style={styles.radioInner} />
                   )}
                 </View>
-
                 <Text
                   style={[
                     styles.categoryText,
@@ -918,7 +747,6 @@ export default function PartnerRegistrationScreen() {
                   Men's Salon
                 </Text>
               </TouchableOpacity>
-
               <TouchableOpacity
                 style={[
                   styles.categoryOption,
@@ -942,7 +770,6 @@ export default function PartnerRegistrationScreen() {
                     <View style={styles.radioInner} />
                   )}
                 </View>
-
                 <Text
                   style={[
                     styles.categoryText,
@@ -953,7 +780,6 @@ export default function PartnerRegistrationScreen() {
                   Beauty Parlour
                 </Text>
               </TouchableOpacity>
-
               <TouchableOpacity
                 style={[
                   styles.categoryOption,
@@ -977,7 +803,6 @@ export default function PartnerRegistrationScreen() {
                     <View style={styles.radioInner} />
                   )}
                 </View>
-
                 <Text
                   style={[
                     styles.categoryText,
@@ -988,24 +813,19 @@ export default function PartnerRegistrationScreen() {
                   Unisex Salon
                 </Text>
               </TouchableOpacity>
-
               {errors.category ? (
                 <Text style={styles.sectionError}>{errors.category}</Text>
               ) : null}
             </View>
           </>
         )}
-
         {currentStep === 3 && (
           <>
-            {/* Salon Address */}
             <Text style={styles.sectionTitle}>Salon Address</Text>
-
             <View style={styles.card}>
               <Text style={styles.label}>
                 Address <Text style={styles.required}>*</Text>
               </Text>
-
               <TextInput
                 style={[styles.input, styles.multilineInput]}
                 placeholder="Enter salon address"
@@ -1020,11 +840,9 @@ export default function PartnerRegistrationScreen() {
               {errors.address ? (
                 <Text style={styles.textFieldError}>{errors.address}</Text>
               ) : null}
-
               <Text style={styles.label}>
                 City <Text style={styles.required}>*</Text>
               </Text>
-
               <TextInput
                 style={styles.input}
                 placeholder="Enter city"
@@ -1038,11 +856,9 @@ export default function PartnerRegistrationScreen() {
               {errors.city ? (
                 <Text style={styles.textFieldError}>{errors.city}</Text>
               ) : null}
-
               <Text style={styles.label}>
                 State <Text style={styles.required}>*</Text>
               </Text>
-
               <TextInput
                 style={styles.input}
                 placeholder="Enter state"
@@ -1056,11 +872,9 @@ export default function PartnerRegistrationScreen() {
               {errors.state ? (
                 <Text style={styles.textFieldError}>{errors.state}</Text>
               ) : null}
-
               <Text style={styles.label}>
                 Pincode <Text style={styles.required}>*</Text>
               </Text>
-
               <TextInput
                 style={styles.input}
                 placeholder="Enter pincode"
@@ -1080,18 +894,13 @@ export default function PartnerRegistrationScreen() {
             </View>
           </>
         )}
-
         {currentStep === 4 && (
           <>
-            {/* KYC */}
             <Text style={styles.sectionTitle}>KYC Details</Text>
-
             <View style={styles.card}>
-              {/* Aadhaar Card */}
               <Text style={styles.label}>
                 Aadhaar Card Number <Text style={styles.required}>*</Text>
               </Text>
-
               <TextInput
                 style={styles.input}
                 placeholder="Enter 12-digit Aadhaar number"
@@ -1110,7 +919,6 @@ export default function PartnerRegistrationScreen() {
                   {errors.aadhaarNumber}
                 </Text>
               ) : null}
-
               <TouchableOpacity
                 style={styles.uploadBox}
                 activeOpacity={0.7}
@@ -1131,12 +939,9 @@ export default function PartnerRegistrationScreen() {
               {errors.aadhaarDocument ? (
                 <Text style={styles.fieldError}>{errors.aadhaarDocument}</Text>
               ) : null}
-
-              {/* PAN Card */}
               <Text style={[styles.label, styles.panLabel]}>
                 PAN Card Number <Text style={styles.required}>*</Text>
               </Text>
-
               <TextInput
                 style={styles.input}
                 placeholder="Enter PAN card number"
@@ -1149,7 +954,6 @@ export default function PartnerRegistrationScreen() {
                     .toUpperCase()
                     .replace(/[^A-Z0-9]/g, "")
                     .slice(0, 10);
-
                   setPanNumber(cleaned);
                   validateField("panNumber", cleaned);
                 }}
@@ -1157,7 +961,6 @@ export default function PartnerRegistrationScreen() {
               {errors.panNumber ? (
                 <Text style={styles.textFieldError}>{errors.panNumber}</Text>
               ) : null}
-
               <TouchableOpacity
                 style={styles.uploadBox}
                 activeOpacity={0.7}
@@ -1179,14 +982,11 @@ export default function PartnerRegistrationScreen() {
             </View>
           </>
         )}
-
-        {/* Navigation / Submit */}
         {Object.values(errors).some((error) => error !== "") && (
           <Text style={styles.formErrorText}>
             {errors.submit || "Please fill all required fields correctly."}
           </Text>
         )}
-
         <View style={styles.navigationRow}>
           {currentStep > 1 && (
             <TouchableOpacity
@@ -1197,7 +997,6 @@ export default function PartnerRegistrationScreen() {
               <Text style={styles.backButtonText}>Back</Text>
             </TouchableOpacity>
           )}
-
           {currentStep < 4 ? (
             <TouchableOpacity
               style={[
@@ -1226,7 +1025,6 @@ export default function PartnerRegistrationScreen() {
             </TouchableOpacity>
           )}
         </View>
-
         <Text style={styles.bottomText}>
           Your details will be reviewed by the admin before approval.
         </Text>
@@ -1234,59 +1032,49 @@ export default function PartnerRegistrationScreen() {
     </SafeAreaView>
   );
 }
-
 const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: "#F8F7FC",
   },
-
   content: {
     paddingBottom: 35,
   },
-
   header: {
     marginBottom: 22,
     alignItems: "center",
     paddingTop: 20,
   },
-
   title: {
     fontSize: 23,
     fontWeight: "800",
     color: "#191522",
   },
-
   subtitle: {
     fontSize: 12,
     color: "#777",
     marginTop: 4,
   },
-
   progressCard: {
     marginHorizontal: 20,
     backgroundColor: "#FFFFFF",
     borderRadius: 16,
     padding: 16,
   },
-
   progressTop: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
   },
-
   progressTitle: {
     fontSize: 14,
     fontWeight: "700",
     color: "#25202F",
   },
-
   progressCount: {
     fontSize: 11,
     color: "#777",
   },
-
   progressTrack: {
     height: 6,
     backgroundColor: "#E9E5F0",
@@ -1294,14 +1082,12 @@ const styles = StyleSheet.create({
     marginTop: 12,
     overflow: "hidden",
   },
-
   progressFill: {
     width: "100%",
     height: "100%",
     backgroundColor: "#5B3CC4",
     borderRadius: 5,
   },
-
   sectionTitle: {
     fontSize: 18,
     fontWeight: "800",
@@ -1310,21 +1096,18 @@ const styles = StyleSheet.create({
     marginTop: 24,
     marginBottom: 11,
   },
-
   card: {
     marginHorizontal: 20,
     backgroundColor: "#FFFFFF",
     borderRadius: 18,
     padding: 18,
   },
-
   label: {
     fontSize: 13,
     fontWeight: "700",
     color: "#25202F",
     marginBottom: 8,
   },
-
   input: {
     height: 50,
     borderWidth: 1,
@@ -1336,13 +1119,11 @@ const styles = StyleSheet.create({
     color: "#191522",
     marginBottom: 17,
   },
-
   multilineInput: {
     height: 85,
     paddingTop: 13,
     textAlignVertical: "top",
   },
-
   categoryOption: {
     height: 52,
     borderWidth: 1,
@@ -1354,12 +1135,10 @@ const styles = StyleSheet.create({
     alignItems: "center",
     marginBottom: 10,
   },
-
   categoryOptionSelected: {
     borderColor: "#5B3CC4",
     backgroundColor: "#F6F2FF",
   },
-
   radioOuter: {
     width: 20,
     height: 20,
@@ -1370,29 +1149,24 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     marginRight: 12,
   },
-
   radioOuterSelected: {
     borderColor: "#5B3CC4",
   },
-
   radioInner: {
     width: 10,
     height: 10,
     borderRadius: 5,
     backgroundColor: "#5B3CC4",
   },
-
   categoryText: {
     fontSize: 14,
     color: "#444",
     fontWeight: "500",
   },
-
   categoryTextSelected: {
     color: "#5B3CC4",
     fontWeight: "700",
   },
-
   salonImageBox: {
     height: 180,
     borderWidth: 1,
@@ -1404,24 +1178,20 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     overflow: "hidden",
   },
-
   salonImagePreview: {
     width: "100%",
     height: "100%",
     resizeMode: "cover",
   },
-
   changeImageButton: {
     alignItems: "center",
     marginTop: 10,
   },
-
   changeImageText: {
     fontSize: 13,
     fontWeight: "700",
     color: "#5B3CC4",
   },
-
   documentSelector: {
     height: 50,
     borderWidth: 1,
@@ -1434,19 +1204,16 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     marginBottom: 17,
   },
-
   documentText: {
     fontSize: 14,
     color: "#888",
   },
-
   arrowContainer: {
     width: 20,
     height: 20,
     justifyContent: "center",
     alignItems: "center",
   },
-
   arrowDown: {
     width: 8,
     height: 8,
@@ -1456,11 +1223,9 @@ const styles = StyleSheet.create({
     transform: [{ rotate: "45deg" }],
     marginTop: -4,
   },
-
   panLabel: {
     marginTop: 20,
   },
-
   uploadBox: {
     height: 110,
     borderWidth: 1,
@@ -1472,26 +1237,22 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     marginTop: 2,
   },
-
   uploadIcon: {
     fontSize: 28,
     color: "#5B3CC4",
     fontWeight: "300",
   },
-
   uploadTitle: {
     fontSize: 13,
     fontWeight: "700",
     color: "#5B3CC4",
     marginTop: 3,
   },
-
   uploadSubtext: {
     fontSize: 10,
     color: "#999",
     marginTop: 3,
   },
-
   textFieldError: {
     color: "#D93025",
     fontSize: 11,
@@ -1499,7 +1260,6 @@ const styles = StyleSheet.create({
     marginBottom: 10,
     marginHorizontal: 2,
   },
-
   fieldError: {
     color: "#D93025",
     fontSize: 11,
@@ -1507,7 +1267,6 @@ const styles = StyleSheet.create({
     marginBottom: 6,
     marginHorizontal: 2,
   },
-
   errorText: {
     color: "#D93025",
     fontSize: 11,
@@ -1515,7 +1274,6 @@ const styles = StyleSheet.create({
     marginBottom: 8,
     marginHorizontal: 2,
   },
-
   sectionError: {
     color: "#D93025",
     fontSize: 11,
@@ -1523,11 +1281,9 @@ const styles = StyleSheet.create({
     marginTop: 6,
     marginBottom: 0,
   },
-
   required: {
     color: "#D93025",
   },
-
   formErrorText: {
     color: "#D93025",
     fontSize: 12,
@@ -1536,7 +1292,6 @@ const styles = StyleSheet.create({
     marginHorizontal: 20,
     marginTop: 20,
   },
-
   submitButton: {
     height: 55,
     marginHorizontal: 20,
@@ -1554,20 +1309,17 @@ const styles = StyleSheet.create({
       height: 3,
     },
   },
-
   submitText: {
     color: "#FFFFFF",
     fontSize: 15,
     fontWeight: "700",
   },
-
   navigationRow: {
     flexDirection: "row",
     marginHorizontal: 20,
     marginTop: 25,
     gap: 10,
   },
-
   backButton: {
     flex: 1,
     height: 55,
@@ -1578,13 +1330,11 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-
   backButtonText: {
     color: "#5B3CC4",
     fontSize: 15,
     fontWeight: "700",
   },
-
   nextButton: {
     flex: 1,
     height: 55,
@@ -1593,17 +1343,14 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-
   nextButtonFull: {
     flex: 1,
   },
-
   nextButtonText: {
     color: "#FFFFFF",
     fontSize: 15,
     fontWeight: "700",
   },
-
   bottomText: {
     textAlign: "center",
     fontSize: 11,
@@ -1619,33 +1366,28 @@ const styles = StyleSheet.create({
     borderRadius: 18,
     padding: 15,
   },
-
   mapTitle: {
     fontSize: 15,
     fontWeight: "800",
     color: "#191522",
   },
-
   mapSubtitle: {
     fontSize: 11,
     color: "#777",
     marginTop: 4,
     marginBottom: 12,
   },
-
   map: {
     width: "100%",
     height: 260,
     borderRadius: 14,
   },
-
   coordinatesBox: {
     marginTop: 10,
     padding: 10,
     borderRadius: 10,
     backgroundColor: "#F6F2FF",
   },
-
   coordinatesText: {
     fontSize: 11,
     color: "#5B3CC4",

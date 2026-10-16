@@ -4,7 +4,6 @@ import Constants from "expo-constants";
 import * as Location from "expo-location";
 import { router, useFocusEffect } from "expo-router";
 import { useCallback, useRef, useState } from "react";
-
 import {
   ActivityIndicator,
   Modal,
@@ -17,10 +16,8 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { WebView } from "react-native-webview";
-
 const GOOGLE_MAPS_API_KEY =
   Constants.expoConfig?.extra?.googleMapsWebApiKey || "";
-
 export default function HomeScreen() {
   const [isLive, setIsLive] = useState(false);
   const [salonName, setSalonName] = useState("Salon");
@@ -37,7 +34,6 @@ export default function HomeScreen() {
   const [locationSuggestions, setLocationSuggestions] = useState<any[]>([]);
   const [locationLoading, setLocationLoading] = useState(false);
   const locationWebViewRef = useRef<WebView>(null);
-
   const [locationError, setLocationError] = useState("");
   const [loadingLive, setLoadingLive] = useState(false);
   const [hasUnreadNotifications, setHasUnreadNotifications] = useState(false);
@@ -47,7 +43,6 @@ export default function HomeScreen() {
   const [todayAppointments, setTodayAppointments] = useState<any[]>([]);
   const [monthlyEarnings, setMonthlyEarnings] = useState(0);
   const [monthlyServices, setMonthlyServices] = useState(0);
-
   const reverseGeocodeLocation = async (
     latitude: number,
     longitude: number,
@@ -56,49 +51,36 @@ export default function HomeScreen() {
     try {
       setLocationLoading(true);
       setLocationError("");
-
       const response = await fetch(
         `${API_URL}/api/salons/reverse-geocode?latitude=${latitude}&longitude=${longitude}`,
       );
-
       const data = await response.json();
-
       if (!response.ok) {
         throw new Error("Reverse geocoding failed");
       }
-
       const result = data?.results?.[0];
-
       if (!result) {
         throw new Error("Address not found");
       }
-
       const components = result.address_components || [];
-
       const getComponent = (type: string) => {
         const component = components.find((item: any) =>
           item.types?.includes(type),
         );
-
         return component?.long_name || "";
       };
-
       const detectedCity =
         getComponent("locality") ||
         getComponent("administrative_area_level_2") ||
         "";
-
       const detectedState = getComponent("administrative_area_level_1");
       const detectedPincode = getComponent("postal_code");
-
       const actualAddress =
         addressOverride || result.formatted_address || "Selected location";
-
       setSelectedAddress(actualAddress);
       setSelectedCity(detectedCity);
       setSelectedState(detectedState);
       setSelectedPincode(detectedPincode);
-
       return {
         address: actualAddress,
         city: detectedCity,
@@ -113,14 +95,11 @@ export default function HomeScreen() {
       setLocationLoading(false);
     }
   };
-
   const getCurrentLocationForModal = async () => {
     try {
       setLocationLoading(true);
       setLocationError("");
-
       const permission = await Location.getForegroundPermissionsAsync();
-
       if (permission.status !== "granted") {
         if (!permission.canAskAgain) {
           setLocationError(
@@ -128,32 +107,25 @@ export default function HomeScreen() {
           );
           return;
         }
-
         const requestedPermission =
           await Location.requestForegroundPermissionsAsync();
-
         if (requestedPermission.status !== "granted") {
           setLocationError("Location permission is required.");
           return;
         }
       }
-
       const currentLocation = await Location.getCurrentPositionAsync({
         accuracy: Location.Accuracy.High,
       });
-
       const { latitude, longitude } = currentLocation.coords;
-
       setSelectedLatitude(latitude);
       setSelectedLongitude(longitude);
-
       locationWebViewRef.current?.injectJavaScript(`
       if (window.moveMarker) {
         window.moveMarker(${latitude}, ${longitude});
       }
       true;
     `);
-
       await reverseGeocodeLocation(latitude, longitude);
     } catch (error) {
       console.error("Current Location Error:", error);
@@ -162,29 +134,21 @@ export default function HomeScreen() {
       setLocationLoading(false);
     }
   };
-
   const openLocationModal = async () => {
     setLocationError("");
     setLocationModalVisible(true);
-
-    // Existing salon location
     if (selectedLatitude !== null && selectedLongitude !== null) {
       setLocationSearch("");
       return;
     }
-
-    // Automatically detect current location
     await getCurrentLocationForModal();
   };
-
   const searchLocationOnMap = () => {
     const query = locationSearch.trim();
-
     if (!query) {
       setLocationSuggestions([]);
       return;
     }
-
     locationWebViewRef.current?.injectJavaScript(`
     if (window.searchLocation) {
       window.searchLocation(${JSON.stringify(query)});
@@ -192,15 +156,12 @@ export default function HomeScreen() {
     true;
   `);
   };
-
   const handleLocationSearchChange = (text: string) => {
     setLocationSearch(text);
-
     if (!text.trim()) {
       setLocationSuggestions([]);
       return;
     }
-
     locationWebViewRef.current?.injectJavaScript(`
     if (window.getLocationSuggestions) {
       window.getLocationSuggestions(${JSON.stringify(text)});
@@ -208,58 +169,39 @@ export default function HomeScreen() {
     true;
   `);
   };
-
-  // ==========================================================
-  // LOAD PARTNER NOTIFICATION STATUS
-  // ==========================================================
-
   const fetchNotificationStatus = useCallback(async () => {
     try {
       const mobile = await AsyncStorage.getItem("partnerMobile");
-
       if (!mobile) {
         return;
       }
-
       const response = await fetch(
         `${API_URL}/api/notifications/partner/${mobile}`,
       );
-
       const data = await response.json();
-
       if (!response.ok || !Array.isArray(data)) {
         return;
       }
-
       const hasUnread = data.some(
         (notification: any) => notification.isRead === false,
       );
-
       setHasUnreadNotifications(hasUnread);
     } catch (error) {
       console.log("Fetch Partner Notification Status Error:", error);
     }
   }, []);
-
   const loadSalon = async () => {
     try {
       const mobile = await AsyncStorage.getItem("partnerMobile");
-
       if (!mobile) {
         return;
       }
-
       const response = await fetch(`${API_URL}/api/salons/partner/${mobile}`);
-
       const data = await response.json();
-
       if (response.ok && data.salon) {
         setSalonName(data.salon.name || "Salon");
         setIsLive(Boolean(data.salon.isLive));
-
-        // Saved salon location
         const salon = data.salon;
-
         if (
           salon.latitude !== null &&
           salon.latitude !== undefined &&
@@ -269,7 +211,6 @@ export default function HomeScreen() {
           setSelectedLatitude(Number(salon.latitude));
           setSelectedLongitude(Number(salon.longitude));
         }
-
         const savedAddress = [
           salon.address,
           salon.city,
@@ -278,10 +219,7 @@ export default function HomeScreen() {
         ]
           .filter(Boolean)
           .join(", ");
-
         setSelectedAddress(savedAddress);
-
-        // Save locally for immediate access
         await AsyncStorage.setItem(
           "partnerLocation",
           JSON.stringify({
@@ -295,19 +233,14 @@ export default function HomeScreen() {
       console.error("Load Salon Error:", error);
     }
   };
-
   const loadTodayStats = async () => {
     try {
       const mobile = await AsyncStorage.getItem("partnerMobile");
-
       if (!mobile) return;
-
       const response = await fetch(
         `${API_URL}/api/bookings/partner/${mobile}/today-stats`,
       );
-
       const data = await response.json();
-
       if (response.ok) {
         setTodayBookings(data.bookings || 0);
         setTodayPending(data.pending || 0);
@@ -319,19 +252,14 @@ export default function HomeScreen() {
       console.error("Load Today Stats Error:", error);
     }
   };
-
   const loadTodayAppointments = async () => {
     try {
       const mobile = await AsyncStorage.getItem("partnerMobile");
-
       if (!mobile) return;
-
       const response = await fetch(
         `${API_URL}/api/bookings/partner/${mobile}/today-appointments`,
       );
-
       const data = await response.json();
-
       if (response.ok) {
         setTodayAppointments(
           Array.isArray(data)
@@ -345,19 +273,14 @@ export default function HomeScreen() {
       console.error("Load Today Appointments Error:", error);
     }
   };
-
   const loadMonthlyEarnings = async () => {
     try {
       const mobile = await AsyncStorage.getItem("partnerMobile");
-
       if (!mobile) return;
-
       const response = await fetch(
         `${API_URL}/api/bookings/partner/${mobile}/monthly-earnings`,
       );
-
       const data = await response.json();
-
       if (response.ok) {
         setMonthlyEarnings(Number(data.monthlyEarnings || 0));
         setMonthlyServices(Number(data.completedCount || 0));
@@ -368,7 +291,6 @@ export default function HomeScreen() {
       console.error("Load Monthly Earnings Error:", error);
     }
   };
-
   useFocusEffect(
     useCallback(() => {
       loadSalon();
@@ -378,19 +300,16 @@ export default function HomeScreen() {
       fetchNotificationStatus();
     }, [fetchNotificationStatus]),
   );
-
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.content}
       >
-        {/* Header */}
         <View style={styles.header}>
           <View style={{ flex: 1 }}>
             <Text style={styles.greeting}>Welcome back 👋</Text>
             <Text style={styles.salonName}>{salonName}</Text>
-
             <TouchableOpacity
               activeOpacity={0.7}
               onPress={openLocationModal}
@@ -412,7 +331,6 @@ export default function HomeScreen() {
               >
                 📍 {selectedAddress || "Set your location"}
               </Text>
-
               <View
                 style={{
                   width: 22,
@@ -436,7 +354,6 @@ export default function HomeScreen() {
               </View>
             </TouchableOpacity>
           </View>
-
           <TouchableOpacity
             activeOpacity={0.8}
             onPress={() => {
@@ -453,7 +370,6 @@ export default function HomeScreen() {
             }}
           >
             <Text style={{ fontSize: 24 }}>🔔</Text>
-
             {hasUnreadNotifications && (
               <View
                 style={{
@@ -471,17 +387,13 @@ export default function HomeScreen() {
             )}
           </TouchableOpacity>
         </View>
-
-        {/* Go Live / Offline */}
         <View style={styles.liveCard}>
           <View style={styles.liveInfo}>
             <View style={[styles.liveDot, !isLive && styles.offlineDot]} />
-
             <View>
               <Text style={styles.liveTitle}>
                 {isLive ? "Salon is Live" : "Salon is Offline"}
               </Text>
-
               <Text style={styles.liveSubtitle}>
                 {isLive
                   ? "Accepting online bookings"
@@ -489,22 +401,17 @@ export default function HomeScreen() {
               </Text>
             </View>
           </View>
-
           <TouchableOpacity
             style={[styles.liveButton, !isLive && styles.offlineButton]}
             activeOpacity={0.8}
             onPress={async () => {
               try {
                 const mobile = await AsyncStorage.getItem("partnerMobile");
-
                 if (!mobile) {
                   return;
                 }
-
                 setLoadingLive(true);
-
                 const newStatus = !isLive;
-
                 const response = await fetch(
                   `${API_URL}/api/salons/partner/${mobile}/live`,
                   {
@@ -517,9 +424,7 @@ export default function HomeScreen() {
                     }),
                   },
                 );
-
                 const data = await response.json();
-
                 if (response.ok) {
                   setIsLive(newStatus);
                 } else {
@@ -542,10 +447,7 @@ export default function HomeScreen() {
             </Text>
           </TouchableOpacity>
         </View>
-
-        {/* Today's Overview */}
         <Text style={styles.sectionTitle}>Today's Overview</Text>
-
         <View style={styles.statsRow}>
           <View style={styles.statCard}>
             <View style={styles.calendarIcon}>
@@ -557,23 +459,18 @@ export default function HomeScreen() {
             <Text style={styles.statValue}>{todayBookings}</Text>
             <Text style={styles.statLabel}>Bookings</Text>
           </View>
-
           <View style={styles.statCard}>
             <Text style={styles.statIcon}>⏳</Text>
             <Text style={styles.statValue}>{todayPending}</Text>
             <Text style={styles.statLabel}>Pending</Text>
           </View>
-
           <View style={styles.statCard}>
             <Text style={styles.statIcon}>₹</Text>
             <Text style={styles.statValue}>₹{todayEarnings}</Text>
             <Text style={styles.statLabel}>Earnings</Text>
           </View>
         </View>
-
-        {/* Quick Actions */}
         <Text style={styles.sectionTitle}>Quick Actions</Text>
-
         <View style={styles.actionGrid}>
           <TouchableOpacity
             style={styles.actionCard}
@@ -583,11 +480,9 @@ export default function HomeScreen() {
             <View style={styles.actionIcon}>
               <Text>✂️</Text>
             </View>
-
             <Text style={styles.actionTitle}>Services</Text>
             <Text style={styles.actionSubtitle}>Manage pricing</Text>
           </TouchableOpacity>
-
           <TouchableOpacity
             style={styles.actionCard}
             activeOpacity={0.8}
@@ -596,11 +491,9 @@ export default function HomeScreen() {
             <View style={styles.actionIcon}>
               <Text>👥</Text>
             </View>
-
             <Text style={styles.actionTitle}>Staff</Text>
             <Text style={styles.actionSubtitle}>Manage staff</Text>
           </TouchableOpacity>
-
           <TouchableOpacity
             style={styles.actionCard}
             activeOpacity={0.8}
@@ -609,11 +502,9 @@ export default function HomeScreen() {
             <View style={styles.actionIcon}>
               <Text>🗓️</Text>
             </View>
-
             <Text style={styles.actionTitle}>Schedule</Text>
             <Text style={styles.actionSubtitle}>Manage slots</Text>
           </TouchableOpacity>
-
           <TouchableOpacity
             style={styles.actionCard}
             activeOpacity={0.8}
@@ -622,13 +513,10 @@ export default function HomeScreen() {
             <View style={styles.actionIcon}>
               <Text>📋</Text>
             </View>
-
             <Text style={styles.actionTitle}>Bookings</Text>
             <Text style={styles.actionSubtitle}>View appointments</Text>
           </TouchableOpacity>
         </View>
-
-        {/* Offers */}
         <TouchableOpacity
           style={styles.offerActionCard}
           activeOpacity={0.8}
@@ -637,14 +525,11 @@ export default function HomeScreen() {
           <View style={styles.actionIcon}>
             <Text>🎁</Text>
           </View>
-
           <View style={styles.offerActionInfo}>
             <Text style={styles.offerActionTitle}>Offers</Text>
             <Text style={styles.offerActionSubtitle}>Manage offers</Text>
           </View>
         </TouchableOpacity>
-
-        {/* Today's Appointments */}
         <View style={styles.sectionHeader}>
           <Text style={styles.sectionTitleNoMargin}>Today's Appointments</Text>
           <TouchableOpacity
@@ -654,7 +539,6 @@ export default function HomeScreen() {
             <Text style={styles.viewAll}>View All</Text>
           </TouchableOpacity>
         </View>
-
         {todayAppointments.length === 0 ? (
           <View style={styles.emptyAppointmentCard}>
             <Text style={styles.emptyAppointmentText}>
@@ -664,27 +548,22 @@ export default function HomeScreen() {
         ) : (
           todayAppointments.map((appointment) => {
             const firstService = appointment.bookingServices?.[0]?.service;
-
             return (
               <View key={appointment.id} style={styles.appointmentCard}>
                 <View style={styles.appointmentTime}>
                   <Text style={styles.time}>{appointment.time}</Text>
                 </View>
-
                 <View style={styles.appointmentInfo}>
                   <Text style={styles.customerName}>
                     {appointment.customer?.name || "Customer"}
                   </Text>
-
                   <Text style={styles.service}>
                     {firstService?.name || "Service"}
                   </Text>
-
                   <Text style={styles.staff}>
                     Staff: {appointment.staff?.name || "Not assigned"}
                   </Text>
                 </View>
-
                 <View
                   style={[
                     styles.confirmedBadge,
@@ -710,23 +589,18 @@ export default function HomeScreen() {
             );
           })
         )}
-
-        {/* Earnings */}
         <Text style={styles.sectionTitle}>Earnings</Text>
-
         <View style={styles.earningsCard}>
           <View>
             <Text style={styles.earningsLabel}>This Month</Text>
             <Text style={styles.earningsAmount}>₹{monthlyEarnings}</Text>
           </View>
-
           <View style={styles.earningsRight}>
             <Text style={styles.earningsSmall}>Completed</Text>
             <Text style={styles.earningsCount}>{monthlyServices} services</Text>
           </View>
         </View>
       </ScrollView>
-
       <Modal
         visible={locationModalVisible}
         animationType="slide"
@@ -738,7 +612,6 @@ export default function HomeScreen() {
             backgroundColor: "#FFFFFF",
           }}
         >
-          {/* HEADER */}
           <View
             style={{
               flexDirection: "row",
@@ -769,7 +642,6 @@ export default function HomeScreen() {
                 ‹
               </Text>
             </TouchableOpacity>
-
             <Text
               style={{
                 fontSize: 19,
@@ -781,8 +653,6 @@ export default function HomeScreen() {
               Confirm Location
             </Text>
           </View>
-
-          {/* SEARCH */}
           <View
             style={{
               marginHorizontal: 16,
@@ -805,7 +675,6 @@ export default function HomeScreen() {
             >
               🔍
             </Text>
-
             <TextInput
               value={locationSearch}
               onChangeText={handleLocationSearchChange}
@@ -819,7 +688,6 @@ export default function HomeScreen() {
                 color: "#222",
               }}
             />
-
             <TouchableOpacity
               activeOpacity={0.7}
               onPress={searchLocationOnMap}
@@ -841,7 +709,6 @@ export default function HomeScreen() {
               </Text>
             </TouchableOpacity>
           </View>
-
           {locationSuggestions.length > 0 && (
             <View
               style={{
@@ -865,7 +732,6 @@ export default function HomeScreen() {
                   onPress={() => {
                     setLocationSearch(item.description);
                     setLocationSuggestions([]);
-
                     locationWebViewRef.current?.injectJavaScript(`
               if (window.selectLocation) {
                 window.selectLocation(
@@ -893,7 +759,6 @@ export default function HomeScreen() {
                   >
                     {item.mainText}
                   </Text>
-
                   {item.secondaryText ? (
                     <Text
                       style={{
@@ -910,8 +775,6 @@ export default function HomeScreen() {
               ))}
             </View>
           )}
-
-          {/* MAP */}
           <View
             style={{
               flex: 1,
@@ -937,8 +800,7 @@ export default function HomeScreen() {
                   initial-scale=1.0,
                   maximum-scale=1.0,
                   user-scalable=no"
-                />
-
+                /> 
                 <style>
                   html,
                   body,
@@ -949,27 +811,21 @@ export default function HomeScreen() {
                     padding: 0;
                   }
                 </style>
-
                 <script src="https://maps.googleapis.com/maps/api/js?key=${GOOGLE_MAPS_API_KEY}&libraries=places"></script>
               </head>
-
               <body>
                 <div id="map"></div>
-
                 <script>
                   let map;
                   let marker;
                   let geocoder;
-
                   const initialLatitude = ${selectedLatitude};
                   const initialLongitude = ${selectedLongitude};
-
                   function initMap() {
                     const position = {
                       lat: initialLatitude,
                       lng: initialLongitude
                     };
-
                     map = new google.maps.Map(
                       document.getElementById("map"),
                       {
@@ -981,21 +837,16 @@ export default function HomeScreen() {
                         zoomControl: true
                       }
                     );
-
                     geocoder = new google.maps.Geocoder();
-
                     marker = new google.maps.Marker({
                       position: position,
                       map: map,
                       draggable: true,
                       title: "Selected Location"
                     });
-
                     marker.addListener("dragend", function() {
                       const position = marker.getPosition();
-
                       if (!position) return;
-
                       window.ReactNativeWebView.postMessage(
                         JSON.stringify({
                           type: "LOCATION_CHANGED",
@@ -1004,18 +855,14 @@ export default function HomeScreen() {
                         })
                       );
                     });
-
                     map.addListener("click", function(event) {
                       if (!event.latLng) return;
-
                       const latitude = event.latLng.lat();
                       const longitude = event.latLng.lng();
-
                       marker.setPosition({
                         lat: latitude,
                         lng: longitude
                       });
-
                       window.ReactNativeWebView.postMessage(
                         JSON.stringify({
                           type: "LOCATION_CHANGED",
@@ -1025,31 +872,25 @@ export default function HomeScreen() {
                       );
                     });
                   }
-
                   window.moveMarker = function(latitude, longitude) {
                     const position = {
                       lat: latitude,
                       lng: longitude
                     };
-
                     if (marker) {
                       marker.setPosition(position);
                     }
-
                     if (map) {
                       map.setCenter(position);
                       map.setZoom(16);
                     }
                   };
-
                   window.getLocationSuggestions = function(query) {
   if (!query || !window.google || !map) {
     return;
   }
-
   const service =
     new google.maps.places.AutocompleteService();
-
   service.getPlacePredictions(
     {
       input: query,
@@ -1091,15 +932,12 @@ export default function HomeScreen() {
     }
   );
 };
-
 window.selectLocation = function(placeId) {
   if (!placeId || !map) {
     return;
   }
-
   const service =
     new google.maps.places.PlacesService(map);
-
   service.getDetails(
     {
       placeId: placeId,
@@ -1119,22 +957,17 @@ window.selectLocation = function(placeId) {
       ) {
         return;
       }
-
       const latitude =
         place.geometry.location.lat();
-
       const longitude =
         place.geometry.location.lng();
-
       const position = {
         lat: latitude,
         lng: longitude
       };
-
       marker.setPosition(position);
       map.setCenter(position);
       map.setZoom(16);
-
       window.ReactNativeWebView.postMessage(
         JSON.stringify({
           type: "LOCATION_SELECTED",
@@ -1149,13 +982,10 @@ window.selectLocation = function(placeId) {
     }
   );
 };
-
                   window.searchLocation = function(query) {
                     if (!query || !window.google) return;
-
                     const service =
                       new google.maps.places.PlacesService(map);
-
                     service.findPlaceFromQuery(
                       {
                         query: query,
@@ -1173,29 +1003,23 @@ window.selectLocation = function(placeId) {
                           results.length > 0
                         ) {
                           const place = results[0];
-
                           if (
                             !place.geometry ||
                             !place.geometry.location
                           ) {
                             return;
                           }
-
                           const latitude =
                             place.geometry.location.lat();
-
                           const longitude =
                             place.geometry.location.lng();
-
                           const position = {
                             lat: latitude,
                             lng: longitude
                           };
-
                           marker.setPosition(position);
                           map.setCenter(position);
                           map.setZoom(16);
-
                          window.ReactNativeWebView.postMessage(
   JSON.stringify({
     type: "LOCATION_SELECTED",
@@ -1211,7 +1035,6 @@ window.selectLocation = function(placeId) {
                       }
                     );
                   };
-
                   window.onload = initMap;
                 </script>
               </body>
@@ -1221,67 +1044,47 @@ window.selectLocation = function(placeId) {
                 onMessage={async (event) => {
                   try {
                     const data = JSON.parse(event.nativeEvent.data);
-
                     if (data?.type === "LOCATION_SUGGESTIONS") {
                       setLocationSuggestions(
                         Array.isArray(data.suggestions) ? data.suggestions : [],
                       );
-
                       return;
                     }
-
                     if (data?.type === "LOCATION_SELECTED") {
                       const latitude = Number(data.latitude);
                       const longitude = Number(data.longitude);
-
                       if (
                         !Number.isFinite(latitude) ||
                         !Number.isFinite(longitude)
                       ) {
                         return;
                       }
-
                       setSelectedLatitude(latitude);
                       setSelectedLongitude(longitude);
-
                       setLocationSuggestions([]);
-
                       const selectedAddress =
                         data.address || "Selected location";
-
                       setLocationSearch(selectedAddress);
-
-                      // Google Places ka actual business/place address
-                      // preserve karna hai.
                       setSelectedAddress(selectedAddress);
-
-                      // Coordinates se city/state/pincode detect karo
-                      // lekin Google ka actual place address overwrite mat karo.
                       await reverseGeocodeLocation(
                         latitude,
                         longitude,
                         selectedAddress,
                       );
-
                       return;
                     }
-
                     if (data?.type === "LOCATION_CHANGED") {
                       const latitude = Number(data.latitude);
                       const longitude = Number(data.longitude);
-
                       if (
                         !Number.isFinite(latitude) ||
                         !Number.isFinite(longitude)
                       ) {
                         return;
                       }
-
                       setSelectedLatitude(latitude);
                       setSelectedLongitude(longitude);
-
                       setLocationSuggestions([]);
-
                       await reverseGeocodeLocation(latitude, longitude);
                     }
                   } catch (error) {
@@ -1298,7 +1101,6 @@ window.selectLocation = function(placeId) {
                 }}
               >
                 <ActivityIndicator size="large" color="#5B3CC4" />
-
                 <Text
                   style={{
                     marginTop: 10,
@@ -1309,8 +1111,6 @@ window.selectLocation = function(placeId) {
                 </Text>
               </View>
             )}
-
-            {/* CURRENT LOCATION BUTTON */}
             <TouchableOpacity
               activeOpacity={0.85}
               onPress={getCurrentLocationForModal}
@@ -1348,8 +1148,6 @@ window.selectLocation = function(placeId) {
               )}
             </TouchableOpacity>
           </View>
-
-          {/* ADDRESS */}
           <View
             style={{
               paddingHorizontal: 18,
@@ -1365,7 +1163,6 @@ window.selectLocation = function(placeId) {
                 }}
               >
                 <ActivityIndicator size="small" color="#5B3CC4" />
-
                 <Text
                   style={{
                     marginLeft: 8,
@@ -1390,7 +1187,6 @@ window.selectLocation = function(placeId) {
                 {selectedAddress || "Move the marker to select your location"}
               </Text>
             )}
-
             {locationError ? (
               <Text
                 style={{
@@ -1403,8 +1199,6 @@ window.selectLocation = function(placeId) {
               </Text>
             ) : null}
           </View>
-
-          {/* CONFIRM */}
           <View
             style={{
               paddingHorizontal: 18,
@@ -1428,18 +1222,14 @@ window.selectLocation = function(placeId) {
                 ) {
                   return;
                 }
-
                 try {
                   setLocationLoading(true);
                   setLocationError("");
-
                   const mobile = await AsyncStorage.getItem("partnerMobile");
-
                   if (!mobile) {
                     setLocationError("Partner mobile not found.");
                     return;
                   }
-
                   const response = await fetch(
                     `${API_URL}/api/salons/partner/${mobile}/location`,
                     {
@@ -1457,20 +1247,14 @@ window.selectLocation = function(placeId) {
                       }),
                     },
                   );
-
                   const data = await response.json();
-
                   if (!response.ok) {
                     console.error("Location Update Error:", data);
-
                     setLocationError(
                       data?.message || "Unable to update location.",
                     );
-
                     return;
                   }
-
-                  // Save locally
                   await AsyncStorage.setItem(
                     "partnerLocation",
                     JSON.stringify({
@@ -1479,18 +1263,13 @@ window.selectLocation = function(placeId) {
                       address: selectedAddress,
                     }),
                   );
-
-                  // Update Home immediately
                   setSelectedAddress(selectedAddress);
                   setSelectedLatitude(selectedLatitude);
                   setSelectedLongitude(selectedLongitude);
-
                   setLocationModalVisible(false);
-
                   console.log("Location Updated Successfully:", data.salon);
                 } catch (error) {
                   console.error("Confirm Location Error:", error);
-
                   setLocationError(
                     "Unable to connect to server. Please try again.",
                   );
@@ -1527,17 +1306,14 @@ window.selectLocation = function(placeId) {
     </SafeAreaView>
   );
 }
-
 const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: "#F8F7FC",
   },
-
   content: {
     paddingBottom: 35,
   },
-
   header: {
     paddingHorizontal: 20,
     paddingTop: 12,
@@ -1546,19 +1322,16 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "space-between",
   },
-
   greeting: {
     fontSize: 13,
     color: "#777",
   },
-
   salonName: {
     fontSize: 25,
     fontWeight: "800",
     color: "#191522",
     marginTop: 3,
   },
-
   profileButton: {
     width: 46,
     height: 46,
@@ -1567,13 +1340,11 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-
   profileText: {
     fontSize: 19,
     fontWeight: "800",
     color: "#7B2CBF",
   },
-
   liveCard: {
     marginHorizontal: 20,
     backgroundColor: "#FFFFFF",
@@ -1585,13 +1356,11 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "#E8E1F5",
   },
-
   liveInfo: {
     flexDirection: "row",
     alignItems: "center",
     flex: 1,
   },
-
   liveDot: {
     width: 11,
     height: 11,
@@ -1599,44 +1368,36 @@ const styles = StyleSheet.create({
     backgroundColor: "#2E8B57",
     marginRight: 10,
   },
-
   offlineDot: {
     backgroundColor: "#D64545",
   },
-
   liveTitle: {
     fontSize: 14,
     fontWeight: "800",
     color: "#191522",
   },
-
   liveSubtitle: {
     fontSize: 11,
     color: "#777",
     marginTop: 3,
   },
-
   liveButton: {
     backgroundColor: "#E8F7ED",
     paddingHorizontal: 12,
     paddingVertical: 7,
     borderRadius: 15,
   },
-
   offlineButton: {
     backgroundColor: "#FDECEC",
   },
-
   liveButtonText: {
     fontSize: 11,
     fontWeight: "800",
     color: "#2E8B57",
   },
-
   offlineButtonText: {
     color: "#D64545",
   },
-
   sectionTitle: {
     fontSize: 18,
     fontWeight: "800",
@@ -1645,19 +1406,16 @@ const styles = StyleSheet.create({
     marginTop: 24,
     marginBottom: 12,
   },
-
   sectionTitleNoMargin: {
     fontSize: 18,
     fontWeight: "800",
     color: "#191522",
   },
-
   statsRow: {
     flexDirection: "row",
     marginHorizontal: 20,
     gap: 10,
   },
-
   statCard: {
     flex: 1,
     backgroundColor: "#FFFFFF",
@@ -1665,31 +1423,26 @@ const styles = StyleSheet.create({
     paddingVertical: 15,
     alignItems: "center",
   },
-
   statIcon: {
     fontSize: 18,
     marginBottom: 7,
   },
-
   statValue: {
     fontSize: 18,
     fontWeight: "800",
     color: "#5B3CC4",
   },
-
   statLabel: {
     fontSize: 10,
     color: "#777",
     marginTop: 3,
   },
-
   actionGrid: {
     flexDirection: "row",
     flexWrap: "wrap",
     marginHorizontal: 20,
     gap: 10,
   },
-
   actionCard: {
     width: "48%",
     backgroundColor: "#FFFFFF",
@@ -1697,7 +1450,6 @@ const styles = StyleSheet.create({
     padding: 15,
     alignItems: "center",
   },
-
   actionIcon: {
     width: 40,
     height: 40,
@@ -1706,7 +1458,6 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-
   offerActionCard: {
     width: "48%",
     marginTop: 10,
@@ -1716,11 +1467,9 @@ const styles = StyleSheet.create({
     alignItems: "center",
     alignSelf: "center",
   },
-
   offerActionInfo: {
     alignItems: "center",
   },
-
   offerActionTitle: {
     fontSize: 14,
     fontWeight: "800",
@@ -1728,14 +1477,12 @@ const styles = StyleSheet.create({
     marginTop: 10,
     textAlign: "center",
   },
-
   offerActionSubtitle: {
     fontSize: 11,
     color: "#888",
     marginTop: 3,
     textAlign: "center",
   },
-
   actionTitle: {
     fontSize: 14,
     fontWeight: "800",
@@ -1743,14 +1490,12 @@ const styles = StyleSheet.create({
     marginTop: 10,
     textAlign: "center",
   },
-
   actionSubtitle: {
     fontSize: 11,
     color: "#888",
     marginTop: 3,
     textAlign: "center",
   },
-
   sectionHeader: {
     marginHorizontal: 20,
     marginTop: 25,
@@ -1759,13 +1504,11 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "space-between",
   },
-
   viewAll: {
     fontSize: 12,
     fontWeight: "700",
     color: "#5B3CC4",
   },
-
   appointmentCard: {
     marginHorizontal: 20,
     marginBottom: 10,
@@ -1775,73 +1518,61 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
   },
-
   appointmentTime: {
     width: 55,
     alignItems: "center",
   },
-
   time: {
     fontSize: 15,
     fontWeight: "800",
     color: "#191522",
   },
-
   am: {
     fontSize: 10,
     color: "#777",
     marginTop: 2,
   },
-
   appointmentInfo: {
     flex: 1,
     marginLeft: 12,
   },
-
   customerName: {
     fontSize: 14,
     fontWeight: "800",
     color: "#25202F",
   },
-
   service: {
     fontSize: 12,
     color: "#666",
     marginTop: 3,
   },
-
   staff: {
     fontSize: 10,
     color: "#999",
     marginTop: 3,
   },
-
   confirmedBadge: {
     backgroundColor: "#E8F7ED",
     paddingHorizontal: 9,
     paddingVertical: 6,
     borderRadius: 14,
   },
-
   confirmedText: {
     fontSize: 10,
     fontWeight: "700",
     color: "#2E8B57",
   },
-
   pendingBadge: {
     backgroundColor: "#FFF4D8",
     paddingHorizontal: 9,
     paddingVertical: 6,
     borderRadius: 14,
   },
-
   pendingText: {
     fontSize: 10,
     fontWeight: "700",
     color: "#B07A00",
   },
-
   earningsCard: {
     marginHorizontal: 20,
     backgroundColor: "#5B3CC4",
@@ -1851,35 +1582,29 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     alignItems: "center",
   },
-
   earningsLabel: {
     fontSize: 11,
     color: "#DDD3F7",
   },
-
   earningsAmount: {
     fontSize: 25,
     fontWeight: "800",
     color: "#FFFFFF",
     marginTop: 4,
   },
-
   earningsRight: {
     alignItems: "flex-end",
   },
-
   earningsSmall: {
     fontSize: 11,
     color: "#DDD3F7",
   },
-
   earningsCount: {
     fontSize: 13,
     fontWeight: "700",
     color: "#FFFFFF",
     marginTop: 4,
   },
-
   calendarIcon: {
     width: 30,
     height: 30,
@@ -1892,7 +1617,6 @@ const styles = StyleSheet.create({
     overflow: "hidden",
     marginBottom: 7,
   },
-
   calendarMonth: {
     width: "100%",
     textAlign: "center",
@@ -1902,7 +1626,6 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     paddingVertical: 1,
   },
-
   calendarDay: {
     fontSize: 12,
     fontWeight: "800",
@@ -1916,32 +1639,27 @@ const styles = StyleSheet.create({
     padding: 25,
     alignItems: "center",
   },
-
   emptyAppointmentText: {
     fontSize: 13,
     color: "#777",
   },
-
   completedBadge: {
     backgroundColor: "#E8F7ED",
     paddingHorizontal: 9,
     paddingVertical: 6,
     borderRadius: 14,
   },
-
   completedText: {
     fontSize: 10,
     fontWeight: "700",
     color: "#2E8B57",
   },
-
   cancelledBadge: {
     backgroundColor: "#FDECEC",
     paddingHorizontal: 9,
     paddingVertical: 6,
     borderRadius: 14,
   },
-
   cancelledText: {
     fontSize: 10,
     fontWeight: "700",
